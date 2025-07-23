@@ -1,7 +1,11 @@
 package com.backend.config.security;
 
-import io.jsonwebtoken.*;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.MalformedJwtException;
+import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import io.jsonwebtoken.security.SignatureException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
@@ -9,16 +13,11 @@ import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
 import javax.crypto.SecretKey;
-import java.time.Instant;
-import java.util.Base64;
 import java.util.Date;
 
 @Component
 @Slf4j
 public class JwtTokenProvider {
-
-    @Value("${jwt.secret}")
-    private String jwtSecret;
 
     @Value("${jwt.expiration}")
     private long jwtExpiration;
@@ -26,65 +25,62 @@ public class JwtTokenProvider {
     @Value("${jwt.magic-link-expiration}")
     private long magicLinkExpiration;
 
-    private SecretKey signingKey;
-    private JwtParser jwtParser;
+    private SecretKey secretKey;
 
     @PostConstruct
     public void init() {
-        if (jwtSecret == null || jwtSecret.isEmpty()) {
-            throw new IllegalArgumentException("JWT secret cannot be null or empty");
-        }
-
-        byte[] decodedKey = Base64.getDecoder().decode(jwtSecret);
-        if (decodedKey.length < 32) {
-            throw new IllegalArgumentException("JWT secret must be at least 256 bits (32 bytes) for HS256");
-        }
-
-        this.signingKey = Keys.hmacShaKeyFor(decodedKey);
-        this.jwtParser = Jwts.parserBuilder()
-                .setSigningKey(signingKey)
-                .build();
+        secretKey = Keys.secretKeyFor(SignatureAlgorithm.HS512);
+        log.info("JWT Token Provider initialized with secret key length: {}", secretKey.getEncoded().length);
     }
 
     public String generateToken(Authentication authentication) {
-        Instant now = Instant.now();
-        Instant expiry = now.plusMillis(jwtExpiration);
-
+        String username = authentication.getName();
         return Jwts.builder()
-                .setSubject(authentication.getName())
-                .setIssuedAt(Date.from(now))
-                .setExpiration(Date.from(expiry))
-                .signWith(signingKey, SignatureAlgorithm.HS256)
+                .setSubject(username)
+                .claim("roles", "ROLE_USER")
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + jwtExpiration))
+                .signWith(secretKey, SignatureAlgorithm.HS512)
                 .compact();
     }
 
     public String generateMagicLinkToken(String email) {
-        Instant now = Instant.now();
-        Instant expiry = now.plusMillis(magicLinkExpiration);
-
         return Jwts.builder()
                 .setSubject(email)
-                .setIssuedAt(Date.from(now))
-                .setExpiration(Date.from(expiry))
-                .signWith(signingKey, SignatureAlgorithm.HS256)
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + magicLinkExpiration))
+                .signWith(secretKey, SignatureAlgorithm.HS512)
                 .compact();
     }
 
     public String getUsernameFromJWT(String token) {
-        return parseClaims(token).getSubject();
+        return Jwts.parserBuilder()
+                .setSigningKey(secretKey)
+                .build()
+                .parseClaimsJws(token)
+                .getBody()
+                .getSubject();
     }
 
     public boolean validateToken(String token) {
         try {
-            parseClaims(token);
+            Jwts.parserBuilder()
+                    .setSigningKey(secretKey)
+                    .build()
+                    .parseClaimsJws(token);
             return true;
-        } catch (JwtException | IllegalArgumentException e) {
-            log.warn("Invalid JWT: {}", e.getMessage());
+        } catch (ExpiredJwtException e) {
+            log.warn("Token expired: {}", e.getMessage());
+            return false;
+        } catch (MalformedJwtException e) {
+            log.warn("Invalid JWT token: {}", e.getMessage());
+            return false;
+        } catch (SignatureException e) {
+            log.warn("Invalid token signature: {}", e.getMessage());
+            return false;
+        } catch (Exception e) {
+            log.error("Unexpected error validating token: {}", e.getMessage(), e);
             return false;
         }
-    }
-
-    private Claims parseClaims(String token) {
-        return jwtParser.parseClaimsJws(token).getBody();
     }
 }
