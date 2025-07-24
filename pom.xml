@@ -117,7 +117,7 @@
                             <artifactId>lombok</artifactId>
                         </exclude>
                     </excludes>
-                    <mainClass>package com.backend.BackendApplication</mainClass>
+                    <mainClass>com.backend.BackendApplication</mainClass>
                 </configuration>
             </plugin>
         </plugins>
