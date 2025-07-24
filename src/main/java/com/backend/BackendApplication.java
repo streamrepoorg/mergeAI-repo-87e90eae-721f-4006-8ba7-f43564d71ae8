@@ -8,12 +8,11 @@ import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.mongo.MongoReactiveAutoConfiguration;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Profile;
 import org.springframework.web.client.RestTemplate;
 
-@SpringBootApplication
-@Profile("live")
-@EnableAutoConfiguration(exclude={MongoReactiveAutoConfiguration.class})
+@SpringBootApplication(exclude = {MongoReactiveAutoConfiguration.class})
+//@Profile("local")
+//@EnableAutoConfiguration(exclude={MongoReactiveAutoConfiguration.class})
 public class BackendApplication {
     public static void main(String[] args) {
         SpringApplication.run(BackendApplication.class, args);

@@ -15,6 +15,6 @@ public class User {
     private String bio;
     private String picture; // Base64 string or URL
     private String password; // Hashed for manual registration
-    private String provider; // "google", "github", or "manual"
+    private String provider;
     private String providerId; // OAuth2 provider ID
 }
