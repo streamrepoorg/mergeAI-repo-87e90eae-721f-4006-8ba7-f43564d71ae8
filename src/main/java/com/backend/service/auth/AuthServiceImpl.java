@@ -10,7 +10,6 @@ import com.backend.model.email.MagicLink;
 import com.backend.model.user.User;
 import com.backend.repository.mail.MagicLinkRepository;
 import com.backend.repository.user.UserRepository;
-import com.backend.service.email.EmailService;
 import com.backend.service.email.EmailServiceImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
@@ -33,9 +32,6 @@ public class AuthServiceImpl implements AuthService {
 
     @Autowired
     private MagicLinkRepository magicLinkRepository;
-
-    @Autowired
-    private MongoTemplate mongoTemplate;
 
     @Autowired
     private JwtTokenProvider jwtTokenProvider;
