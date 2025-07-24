@@ -11,7 +11,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Profile;
 
 @SpringBootApplication
-@Profile("local")
+@Profile("live")
 @EnableAutoConfiguration(exclude={MongoReactiveAutoConfiguration.class})
 public class BackendApplication {
     public static void main(String[] args) {
