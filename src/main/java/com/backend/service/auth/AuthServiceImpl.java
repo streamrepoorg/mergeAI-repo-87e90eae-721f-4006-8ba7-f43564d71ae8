@@ -11,13 +11,13 @@ import com.backend.model.user.User;
 import com.backend.repository.mail.MagicLinkRepository;
 import com.backend.repository.user.UserRepository;
 import com.backend.service.email.EmailService;
+import com.backend.service.email.EmailServiceImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -34,7 +34,6 @@ public class AuthServiceImpl implements AuthService {
     @Autowired
     private MagicLinkRepository magicLinkRepository;
 
-//    ensure MongoDB is running on the specified host/port (default: localhost:27017).
     @Autowired
     private MongoTemplate mongoTemplate;
 
@@ -42,12 +41,12 @@ public class AuthServiceImpl implements AuthService {
     private JwtTokenProvider jwtTokenProvider;
 
     @Autowired
-    private EmailService emailService;
+    private EmailServiceImpl emailService;
 
     private final ModelMapper modelMapper = new ModelMapper();
 
     boolean isValidEmail(String email) {
-        return !email.isEmpty();
+        return email.contains("@") && email.contains(".");
     }
 
     private String encryptPassword(String password) {
@@ -91,25 +90,24 @@ public class AuthServiceImpl implements AuthService {
         if (existByEmail(userDTO.getEmail())) {
             throw new UserAlreadyExistException("Email already exists");
         }
-
         User user = new User();
         modelMapper.map(userDTO, user);
         user.setPassword(encryptPassword(userDTO.getPassword()));
         user.setProvider("manual");
-
-        log.info("Registering user --> id={}, email={}", user.getId(), user.getEmail());
+        User savedUser;
         try {
-            User savedUser = userRepository.save(user);
+            savedUser = userRepository.save(user);
             log.info("Successfully saved user --> id={}, email={}", savedUser.getId(), savedUser.getEmail());
-            User verifiedUser = mongoTemplate.findById(savedUser.getId(), User.class);
-            if (verifiedUser == null) {
-                log.warn("User saved but not found in MongoDB: id={}", savedUser.getId());
-            }
         } catch (Exception e) {
             log.error("Failed to save user: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to save user to MongoDB", e);
         }
-        requestMagicLink(user.getEmail());
+        try {
+            requestMagicLink(savedUser.getEmail());
+        } catch (Exception e) {
+            log.error("Magic link email failed to send to {}: {}", savedUser.getEmail(), e.getMessage(), e);
+            throw new RuntimeException("Failed to send magic link. User not saved.", e);
+        }
     }
 
     @Override
@@ -141,7 +139,7 @@ public class AuthServiceImpl implements AuthService {
         MagicLink magicLink = new MagicLink();
         magicLink.setUserId(userOpt.get().getId());
         magicLink.setToken(token);
-        magicLink.setExpiresAt(Instant.now().plusMillis(magicLinkExpiration)); // Use config value
+        magicLink.setExpiresAt(Instant.now().plusMillis(magicLinkExpiration));
         magicLinkRepository.save(magicLink);
 
         String link = "http://localhost:8080/api/auth/magic-login?token=" + token;

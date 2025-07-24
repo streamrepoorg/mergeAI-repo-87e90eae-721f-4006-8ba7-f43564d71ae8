@@ -70,11 +70,11 @@ public class AuthControllerTest {
     @Test
     void test_createUserAccount() throws Exception {
         UserDTO userDTO = new UserDTO();
-        userDTO.setUsername("ziemon");
+        userDTO.setUsername("zipDemon");
         userDTO.setBio("Everybody's friendly neighbour");
         userDTO.setName("Kelechi Divine");
         userDTO.setPicture("");
-        userDTO.setEmail("okorkelechi123@gmail.com");
+        userDTO.setEmail("okoroaforkelechi123@gmail.com");
         userDTO.setPassword("StrongPassword128njowqe20i@#3@");
 
         mockMvc.perform(post("/api/auth/register")
