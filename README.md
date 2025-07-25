@@ -1,6 +1,6 @@
 # StreamRepo API documentation
 
-## Endpoint Overview
+## 1: Endpoint Overview
 The User Registration API is a POST endpoint designed for creating user accounts. It validates input, checks email uniqueness, enforces password strength, and sends a verification email with a magic link. The endpoint is part of the authentication module, accessible at `/api/auth/register`.
 
 ### Base URL
@@ -159,11 +159,11 @@ To test the API, you can use tools like Postman or cURL. Below is a cURL example
 curl -X POST https://stream-repo-l30u.onrender.com/api/auth/register \
 -H "Content-Type: application/json" \
 -d '{
-  "username": "john_doe",
-  "name": "John Doe",
-  "email": "john.doe@example.com",
-  "bio": "A passionate coder and tech enthusiast",
-  "picture": "https://example.com/profile.jpg",
+   "username": "zipDemon",
+  "name": "Kelechi Divine",
+  "email": "okoroaforkelechi123@streamrepo.com",
+  "bio": "Javascript is shit",
+  "picture": "",
   "password": "SecurePass123!"
 }'
 ```
