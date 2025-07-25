@@ -1,14 +1,7 @@
+# StreamRepo API documentation
 
-
-# User Registration API Documentation
-
-## Introduction
-This document provides a comprehensive guide to the User Registration API for the Stream application, hosted at `https://stream-repo-l30u.onrender.com`. The API enables users to create an account by submitting essential details like username, email, and password. Built with Spring Boot and a robust backend architecture, it ensures secure and reliable user registration. This article covers the API’s functionality, request structure, response details, and error handling in clear, simple English.
-
-The goal is to help developers integrate with the API easily while keeping a professional yet approachable tone. Let’s get started!
-
-## API Overview
-The User Registration API is a POST endpoint designed for user account creation. It validates input, checks email uniqueness, enforces password strength, and sends a magic link email for verification. The endpoint is part of the authentication module, accessible at `/api/auth/register`.
+## Endpoint Overview
+The User Registration API is a POST endpoint designed for creating user accounts. It validates input, checks email uniqueness, enforces password strength, and sends a verification email with a magic link. The endpoint is part of the authentication module, accessible at `/api/auth/register`.
 
 ### Base URL
 ```
@@ -44,11 +37,11 @@ The request body must include the following fields, as defined in the `UserDTO` 
 ### Example Request
 ```json
 {
-  "username": "john_doe",
-  "name": "John Doe",
-  "email": "john.doe@example.com",
-  "bio": "A passionate coder and tech enthusiast",
-  "picture": "https://example.com/profile.jpg",
+  "username": "zipDemon",
+  "name": "Kelechi Divine",
+  "email": "okoroaforkelechi123@streamrepo.com",
+  "bio": "Javascript is shit",
+  "picture": "",
   "password": "SecurePass123!"
 }
 ```
@@ -156,22 +149,8 @@ The API handles errors gracefully. Below are common error scenarios and their re
 **Possible Causes**:
 - Failure to save the user to MongoDB.
 - Failure to send the magic link email.
-
-## Backend Logic
-The registration process involves several steps, handled by the `AuthServiceImpl` and `AuthController` classes:
-
-1. **Input Validation**: The `UserDTO` is validated using Jakarta Bean Validation annotations (`@NotBlank`, `@Email`, `@Size`). The service layer performs additional checks for email validity and password strength.
-2. **Email Uniqueness**: The service checks if the email already exists in the database.
-3. **Password Encryption**: The password is encrypted before storage using a secure encryption method.
-4. **User Storage**: The user is saved to MongoDB. If this fails, an exception is thrown.
-5. **Magic Link Email**: A magic link is sent to the user’s email for verification. If this fails, the registration is rolled back.
-6. **Response Generation**: The controller returns a success or error response based on the outcome.
-
-### Key Components
-- **UserDTO**: Defines the structure and validation rules for the request payload.
-- **AuthServiceImpl**: Contains the core registration logic, including validation, encryption, and email triggering.
-- **AuthController**: Handles HTTP requests, delegates to the service layer, and formats responses.
-- **ResponseDetails**: A custom class for consistent response formatting (timestamp, message, status).
+  
+**Note**: Most times, this error is caused by a timeout. I increased the timeout from 5000 (5 seconds) to 20000 (20 seconds), so you might not likely get a 500 internal error.
 
 ## Testing the API
 To test the API, you can use tools like Postman or cURL. Below is a cURL example for a successful registration:
@@ -197,18 +176,3 @@ curl -X POST https://stream-repo-l30u.onrender.com/api/auth/register \
   "status": "CREATED"
 }
 ```
-
-## Error Handling Tips
-- **Client-Side Validation**: Validate inputs on the client side to reduce unnecessary API calls.
-- **Retry Logic**: For `500 Internal Server Error`, implement retry logic with exponential backoff.
-- **User Feedback**: Display error messages (e.g., “Email already exists”) clearly to users.
-
-## Security Considerations
-- **Password Strength**: The API enforces strong passwords, but clients should encourage users to use unique passwords.
-- **Email Verification**: The magic link ensures only valid emails are registered.
-- **Data Encryption**: Passwords are encrypted before storage, and HTTPS is used to protect data in transit.
-- **Rate Limiting**: Consider adding rate limiting to prevent brute-force attacks.
-
-## Conclusion
-The User Registration API at `https://stream-repo-l30u.onrender.com/api/auth/register` provides a secure and straightforward way to create user accounts. With clear validation rules, detailed error handling, and a magic link verification, it ensures a robust user onboarding experience. Developers can easily integrate this API into their applications using the provided request and response examples. For further assistance or feedback, feel free to reach out to the Stream support team!
-
