@@ -16,6 +16,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -87,48 +88,52 @@ public class AuthControllerTest {
         assertThat(savedUser.get().getUsername()).isEqualTo("zipDemon");
         log.info("Verified user in MongoDB: {}", savedUser.get());
     }
-//
-//    @Test
-//    public void testRegister_EmailExists() throws Exception {
-//        UserDTO userDTO = new UserDTO();
-//        userDTO.setUsername("testuser");
-//        userDTO.setEmail("test@example.com");
-//
-//        when(authService.existByEmail(anyString())).thenReturn(true);
-//        mockMvc.perform(post("/api/auth/register")
-//                        .contentType(MediaType.APPLICATION_JSON)
-//                        .content(objectMapper.writeValueAsString(userDTO)))
-//                .andExpect(status().isConflict())
-//                .andExpect(jsonPath("$.message").value("User with this email already exists"))
-//                .andExpect(jsonPath("$.status").value("CONFLICT"));
-//        verify(authService, times(1)).existByEmail("test@example.com");
-//        verify(authService, never()).registerUser(any(UserDTO.class));
-//    }
-//
-//    @Test
-//    public void testRegister_InvalidInput() throws Exception {
-//        UserDTO userDTO = new UserDTO();
-//        userDTO.setUsername("");
-//        userDTO.setName("Test User");
-//        userDTO.setEmail("invalid-email");
-//        userDTO.setPassword("short");
-//
-//        // Act & Assert
-//        mockMvc.perform(post("/api/auth/register")
-//                        .contentType(MediaType.APPLICATION_JSON)
-//                        .content(objectMapper.writeValueAsString(userDTO)))
-//                .andExpect(status().isBadRequest())
-//                .andExpect(jsonPath("$.username").value("Username is required"))
-//                .andExpect(jsonPath("$.email").value("Email must be valid"))
-//                .andExpect(jsonPath("$.password").value("Password must be at least 8 characters"));
-//
-//        verify(authService, never()).existByEmail(anyString());
-//        verify(authService, never()).registerUser(any(UserDTO.class));
-//    }
-//
+
+    @Test
+    public void test_registerEmailAlreadyExists() throws Exception {
+        UserDTO userDTO = new UserDTO();
+        userDTO.setUsername("zipDemon");
+        userDTO.setBio("Everybody's friendly neighbour");
+        userDTO.setName("Kelechi Divine");
+        userDTO.setPicture("");
+        userDTO.setEmail("okoroaforkelechi123@gmail.com");
+        userDTO.setPassword("StrongPassword128njowqe20i@#3@");
+
+        when(authService.existByEmail(anyString())).thenReturn(true);
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(userDTO)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("A user with that email already exists"))
+                .andExpect(jsonPath("$.status").value("CONFLICT"));
+        verify(authService, times(1)).existByEmail("okoroaforkelechi123@gmail.com");
+        verify(authService, never()).registerUser(any(UserDTO.class));
+    }
+
+    @Test
+    public void test_registerInvalidFields() throws Exception {
+        UserDTO userDTO = new UserDTO();
+        userDTO.setUsername("");
+        userDTO.setBio("");
+        userDTO.setName("");
+        userDTO.setPicture("");
+        userDTO.setEmail("okoroaforkelechi123@gmail.com");
+        userDTO.setPassword("StrongPassword128njowqe20i@#3@");
+
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(userDTO)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.username").value("Username must be valid"))
+                .andExpect(jsonPath("$.email").value("Email must be valid"))
+                .andExpect(jsonPath("$.password").value("Password must be at least 8 characters"));
+
+        verify(authService, never()).existByEmail(anyString());
+        verify(authService, never()).registerUser(any(UserDTO.class));
+    }
+
 //    @Test
 //    public void testLogin_Success() throws Exception {
-//        // Arrange
 //        UserDTO userDTO = new UserDTO();
 //        userDTO.setUsername("testuser");
 //        userDTO.setPassword("securePass123");
@@ -137,7 +142,6 @@ public class AuthControllerTest {
 //        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class))).thenReturn(authentication);
 //        when(jwtTokenProvider.generateToken(authentication)).thenReturn("jwt-token");
 //
-//        // Act & Assert
 //        mockMvc.perform(post("/api/auth/login")
 //                        .contentType(MediaType.APPLICATION_JSON)
 //                        .content(objectMapper.writeValueAsString(userDTO)))
@@ -149,7 +153,7 @@ public class AuthControllerTest {
 //        verify(authenticationManager, times(1)).authenticate(any(UsernamePasswordAuthenticationToken.class));
 //        verify(jwtTokenProvider, times(1)).generateToken(authentication);
 //    }
-//
+
 //    @Test
 //    public void testLogin_InvalidCredentials() throws Exception {
 //        // Arrange
@@ -171,129 +175,17 @@ public class AuthControllerTest {
 //        verify(authenticationManager, times(1)).authenticate(any(UsernamePasswordAuthenticationToken.class));
 //    }
 //
-//    @Test
-//    public void testRequestMagicLink_Success() throws Exception {
-//        MagicLinkRequest request = new MagicLinkRequest();
-//        request.setEmail("test@example.com");
-//        doNothing().when(authService).requestMagicLink(anyString());
-//        mockMvc.perform(post("/api/auth/magic-link")
-//                        .contentType(MediaType.APPLICATION_JSON)
-//                        .content(objectMapper.writeValueAsString(request)))
-//                .andExpect(status().isOk())
-//                .andExpect(jsonPath("$.message").value("Magic link sent to email"))
-//                .andExpect(jsonPath("$.status").value("OK"));
-//
-//        verify(authService, times(1)).requestMagicLink("test@example.com");
-//    }
-//
-//    @Test
-//    public void testRequestMagicLink_UserNotFound() throws Exception {
-//        MagicLinkRequest request = new MagicLinkRequest();
-//        request.setEmail("invalid-email");
-//        doThrow(new UserNotFoundException("User not found")).when(authService).requestMagicLink(anyString());
-//        mockMvc.perform(post("/api/auth/magic-link")
-//                        .contentType(MediaType.APPLICATION_JSON)
-//                        .content(objectMapper.writeValueAsString(request)))
-//                .andExpect(status().isBadRequest())
-//                .andExpect(jsonPath("$.message").value("User not found"))
-//                .andExpect(jsonPath("$.status").value("BAD_REQUEST"));
-//
-//        verify(authService, times(1)).requestMagicLink("invalid-email");
-//    }
-//
-//    @Test
-//    public void testMagicLogin_Success() throws Exception {
-//        UserDTO userDTO = new UserDTO();
-//        userDTO.setUsername("testuser");
-//        userDTO.setEmail("test@example.com");
-//
-//        when(authService.validateMagicLink("valid-token")).thenReturn(userDTO);
-//        when(jwtTokenProvider.generateToken(any(Authentication.class))).thenReturn("jwt-token");
-//        mockMvc.perform(get("/api/auth/magic-login")
-//                        .param("token", "valid-token"))
-//                .andExpect(status().isOk())
-//                .andExpect(jsonPath("$.token").value("jwt-token"))
-//                .andExpect(jsonPath("$.message").value("Magic link login successful"))
-//                .andExpect(jsonPath("$.status").value("OK"));
-//
-//        verify(authService, times(1)).validateMagicLink("valid-token");
-//        verify(jwtTokenProvider, times(1)).generateToken(any(Authentication.class));
-//    }
-//
-//    @Test
-//    public void testMagicLogin_InvalidToken() throws Exception {
-//        when(authService.validateMagicLink("invalid-token"))
-//                .thenThrow(new RuntimeException("Invalid or expired magic link"));
-//        mockMvc.perform(get("/api/auth/magic-login")
-//                        .param("token", "invalid-token"))
-//                .andExpect(status().isBadRequest())
-//                .andExpect(jsonPath("$.message").value("Invalid or expired magic link"))
-//                .andExpect(jsonPath("$.status").value("BAD_REQUEST"));
-//
-//        verify(authService, times(1)).validateMagicLink("invalid-token");
-//    }
-//
-//    @Test
-//    public void testOAuth2Success_Google() throws Exception {
-//        Map<String, Object> attributes = new HashMap<>();
-//        attributes.put("sub", "12345");
-//        attributes.put("email", "test@example.com");
-//        attributes.put("name", "Test User");
-//        attributes.put("picture", "base64-image");
-//
-//        OAuth2User oAuth2User = new DefaultOAuth2User(Collections.emptyList(), attributes, "sub");
-//        OAuth2AuthenticationToken authentication = new OAuth2AuthenticationToken(
-//                oAuth2User, Collections.emptyList(), "google");
-//
-//        UserDTO userDTO = new UserDTO();
-//        userDTO.setUsername("testuser");
-//        userDTO.setEmail("test@example.com");
-//        userDTO.setName("Test User");
-//        userDTO.setPicture("base64-image");
-//
-//        when(authService.handleOAuth2User("google", "12345", "test@example.com", "Test User", "base64-image"))
-//                .thenReturn(userDTO);
-//        when(jwtTokenProvider.generateToken(any(Authentication.class))).thenReturn("jwt-token");
-//        mockMvc.perform(get("/api/auth/oauth2/success")
-//                        .principal(authentication))
-//                .andExpect(status().isOk())
-//                .andExpect(jsonPath("$.token").value("jwt-token"))
-//                .andExpect(jsonPath("$.message").value("OAuth2 login successful"))
-//                .andExpect(jsonPath("$.status").value("OK"));
-//
-//        verify(authService, times(1)).handleOAuth2User("google", "12345", "test@example.com", "Test User", "base64-image");
-//        verify(jwtTokenProvider, times(1)).generateToken(any(Authentication.class));
-//    }
-//
-//    @Test
-//    public void testOAuth2Success_GitHub() throws Exception {
-//        Map<String, Object> attributes = new HashMap<>();
-//        attributes.put("id", "67890");
-//        attributes.put("email", "test@example.com");
-//        attributes.put("name", "Test User");
-//        attributes.put("picture", "base64-image");
-//
-//        OAuth2User oAuth2User = new DefaultOAuth2User(Collections.emptyList(), attributes, "id");
-//        OAuth2AuthenticationToken authentication = new OAuth2AuthenticationToken(
-//                oAuth2User, Collections.emptyList(), "github");
-//
-//        UserDTO userDTO = new UserDTO();
-//        userDTO.setUsername("testuser");
-//        userDTO.setEmail("test@example.com");
-//        userDTO.setName("Test User");
-//        userDTO.setPicture("base64-image");
-//
-//        when(authService.handleOAuth2User("github", "67890", "test@example.com", "Test User", "base64-image"))
-//                .thenReturn(userDTO);
-//        when(jwtTokenProvider.generateToken(any(Authentication.class))).thenReturn("jwt-token");
-//        mockMvc.perform(get("/api/auth/oauth2/success")
-//                        .principal(authentication))
-//                .andExpect(status().isOk())
-//                .andExpect(jsonPath("$.token").value("jwt-token"))
-//                .andExpect(jsonPath("$.message").value("OAuth2 login successful"))
-//                .andExpect(jsonPath("$.status").value("OK"));
-//
-//        verify(authService, times(1)).handleOAuth2User("github", "67890", "test@example.com", "Test User", "base64-image");
-//        verify(jwtTokenProvider, times(1)).generateToken(any(Authentication.class));
-//    }
+    @Test
+    public void test_requestMagicLinkSuccess() throws Exception {
+        MagicLinkRequest request = new MagicLinkRequest();
+        request.setEmail("okoroaforkelechi123@gmail.com");
+        doNothing().when(authService).requestMagicLink(anyString());
+        mockMvc.perform(post("/api/auth/magic-link")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Magic link sent successfully"))
+                .andExpect(jsonPath("$.status").value("OK"));
+        verify(authService, times(1)).requestMagicLink("okoroaforkelechi123@gmail.com");
+    }
 }

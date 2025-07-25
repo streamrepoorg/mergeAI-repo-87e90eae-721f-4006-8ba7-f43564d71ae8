@@ -11,8 +11,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.web.client.RestTemplate;
 
 @SpringBootApplication(exclude = {MongoReactiveAutoConfiguration.class})
-//@Profile("local")
-//@EnableAutoConfiguration(exclude={MongoReactiveAutoConfiguration.class})
 public class BackendApplication {
     public static void main(String[] args) {
         SpringApplication.run(BackendApplication.class, args);

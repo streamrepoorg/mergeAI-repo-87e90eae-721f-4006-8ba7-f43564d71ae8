@@ -15,7 +15,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -41,6 +40,12 @@ public class AuthServiceImpl implements AuthService {
 
     private final ModelMapper modelMapper = new ModelMapper();
 
+    @Value("${frontend.url}")
+    private String frontendUrl;
+
+    @Value("${jwt.magic-link-expiration}")
+    private Long magicLinkExpiration;
+
     boolean isValidEmail(String email) {
         return email.contains("@") && email.contains(".");
     }
@@ -49,9 +54,6 @@ public class AuthServiceImpl implements AuthService {
         BCryptPasswordEncoder bCryptPasswordEncoder = new BCryptPasswordEncoder();
         return bCryptPasswordEncoder.encode(password);
     }
-
-    @Value("${jwt.magic-link-expiration}")
-    private Long magicLinkExpiration;
 
     private boolean isStrongPassword(String password) {
         String passwordRegex = "^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z]).{8,}$";
@@ -138,7 +140,7 @@ public class AuthServiceImpl implements AuthService {
         magicLink.setExpiresAt(Instant.now().plusMillis(magicLinkExpiration));
         magicLinkRepository.save(magicLink);
 
-        String link = "http://localhost:8080/api/auth/magic-login?token=" + token;
+        String link = String.format("%s/auth/login?token=%s", frontendUrl, token);
         emailService.sendMagicLink(email, link);
         log.info("Magic link sent to {} with token: {}", email, token);
     }
