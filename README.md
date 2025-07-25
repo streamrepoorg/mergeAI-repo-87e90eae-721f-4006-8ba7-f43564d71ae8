@@ -1,6 +1,6 @@
 # StreamRepo API documentation
 
-## 1: Endpoint Overview
+## 1: Register endpoint Overview
 The User Registration API is a POST endpoint designed for creating user accounts. It validates input, checks email uniqueness, enforces password strength, and sends a verification email with a magic link. The endpoint is part of the authentication module, accessible at `/api/auth/register`.
 
 ### Base URL
