@@ -12,6 +12,6 @@ public class MagicLink {
     @Id
     private String id;
     private String userId;
-    private String token;
+    private String link;
     private Instant expiresAt;
 }

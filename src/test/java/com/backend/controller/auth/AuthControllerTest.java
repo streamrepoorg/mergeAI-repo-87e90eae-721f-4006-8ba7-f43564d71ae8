@@ -69,7 +69,7 @@ public class AuthControllerTest {
     private ObjectMapper objectMapper;
 
     @Test
-    void test_createUserAccount() throws Exception {
+    public void test_createUserAccount() throws Exception {
         UserDTO userDTO = new UserDTO();
         userDTO.setUsername("zipDemon");
         userDTO.setBio("Everybody's friendly neighbour");
@@ -87,6 +87,17 @@ public class AuthControllerTest {
         assertThat(savedUser).isPresent();
         assertThat(savedUser.get().getUsername()).isEqualTo("zipDemon");
         log.info("Verified user in MongoDB: {}", savedUser.get());
+    }
+
+    @Test
+    public void test_validateMagicLinkSuccess() throws Exception {
+        String token = "iamX4oaYb3ZWzy3xcY2g-MhHd_lRmTvNl14kV68KfEk";
+        when(authService.validateMagicLink(token)).thenReturn(token);
+        mockMvc.perform(get("/api/auth/validate-magic-link").param("link", token))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.message").value("Your account has been verified successfully"));
+
+        verify(authService, times(1)).validateMagicLink(token);
     }
 
     @Test
@@ -132,49 +143,6 @@ public class AuthControllerTest {
         verify(authService, never()).registerUser(any(UserDTO.class));
     }
 
-//    @Test
-//    public void testLogin_Success() throws Exception {
-//        UserDTO userDTO = new UserDTO();
-//        userDTO.setUsername("testuser");
-//        userDTO.setPassword("securePass123");
-//
-//        Authentication authentication = new UsernamePasswordAuthenticationToken("testuser", "securePass123", Collections.emptyList());
-//        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class))).thenReturn(authentication);
-//        when(jwtTokenProvider.generateToken(authentication)).thenReturn("jwt-token");
-//
-//        mockMvc.perform(post("/api/auth/login")
-//                        .contentType(MediaType.APPLICATION_JSON)
-//                        .content(objectMapper.writeValueAsString(userDTO)))
-//                .andExpect(status().isOk())
-//                .andExpect(jsonPath("$.token").value("jwt-token"))
-//                .andExpect(jsonPath("$.message").value("Login successful"))
-//                .andExpect(jsonPath("$.status").value("OK"));
-//
-//        verify(authenticationManager, times(1)).authenticate(any(UsernamePasswordAuthenticationToken.class));
-//        verify(jwtTokenProvider, times(1)).generateToken(authentication);
-//    }
-
-//    @Test
-//    public void testLogin_InvalidCredentials() throws Exception {
-//        // Arrange
-//        UserDTO userDTO = new UserDTO();
-//        userDTO.setUsername("testuser");
-//        userDTO.setPassword("wrongPass");
-//
-//        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
-//                .thenThrow(new org.springframework.security.core.AuthenticationException("Invalid credentials") {});
-//
-//        // Act & Assert
-//        mockMvc.perform(post("/api/auth/login")
-//                        .contentType(MediaType.APPLICATION_JSON)
-//                        .content(objectMapper.writeValueAsString(userDTO)))
-//                .andExpect(status().isUnauthorized())
-//                .andExpect(jsonPath("$.message").value("Invalid credentials"))
-//                .andExpect(jsonPath("$.status").value("UNAUTHORIZED"));
-//
-//        verify(authenticationManager, times(1)).authenticate(any(UsernamePasswordAuthenticationToken.class));
-//    }
-//
     @Test
     public void test_requestMagicLinkSuccess() throws Exception {
         MagicLinkRequest request = new MagicLinkRequest();
