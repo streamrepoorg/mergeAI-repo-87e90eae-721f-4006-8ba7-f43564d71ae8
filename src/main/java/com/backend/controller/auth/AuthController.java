@@ -44,25 +44,19 @@ public class AuthController {
         log.info("Registering user with email: {}", userDTO.getEmail());
         try {
             authService.registerUser(userDTO);
-            ResponseDetails responseDetails = new ResponseDetails(
-                    LocalDateTime.now(), "Your account has been created successfully", HttpStatus.CREATED.toString()
+            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "Your account has been created successfully", HttpStatus.CREATED.toString()
             );
             return ResponseEntity.status(201).body(responseDetails);
         } catch (EmptyFieldException | PasswordOrEmailException | UserAlreadyExistException e) {
             log.error("Registration failed: {}", e.getMessage());
-            ResponseDetails responseDetails = new ResponseDetails(
-                    LocalDateTime.now(), e.getMessage(), HttpStatus.BAD_REQUEST.toString()
-            );
+            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), e.getMessage(), HttpStatus.BAD_REQUEST.toString());
             return ResponseEntity.status(400).body(responseDetails);
         } catch (Exception e) {
             log.error("Unexpected error during registration: {}", e.getMessage(), e);
-            ResponseDetails responseDetails = new ResponseDetails(
-                    LocalDateTime.now(), "Failed to save user", HttpStatus.INTERNAL_SERVER_ERROR.toString()
-            );
+            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "Failed to save user", HttpStatus.INTERNAL_SERVER_ERROR.toString());
             return ResponseEntity.status(500).body(responseDetails);
         }
     }
-
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody UserDTO userDTO) {
@@ -94,18 +88,15 @@ public class AuthController {
         }
     }
 
-    @GetMapping("/magic-login")
-    public ResponseEntity<?> magicLogin(@RequestParam String token) {
+    @GetMapping("/validate-magic-link")
+    public ResponseEntity<?> validateMagicLink(@RequestParam String link) {
         try {
-            log.info("Validating magic link token");
-            UserDTO userDTO = authService.validateMagicLink(token);
-            Authentication authentication = new UsernamePasswordAuthenticationToken(userDTO.getUsername(), null, Collections.emptyList());
-            String jwt = jwtTokenProvider.generateToken(authentication);
-            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "Magic link login successful", HttpStatus.OK.toString());
-            return ResponseEntity.status(200).body(new JwtResponse(jwt));
+            authService.validateMagicLink(link);
+            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "Your account has been verified successfully", HttpStatus.OK.toString());
+            return ResponseEntity.status(201).body(responseDetails);
         } catch (Exception e) {
             log.error("Magic link validation failed: {}", e.getMessage());
-            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "Invalid or expired magic link", HttpStatus.BAD_REQUEST.toString());
+            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "Your magic link is expired already", HttpStatus.BAD_REQUEST.toString());
             return ResponseEntity.status(400).body(responseDetails);
         }
     }

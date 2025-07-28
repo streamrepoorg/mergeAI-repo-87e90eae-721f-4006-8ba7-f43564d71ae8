@@ -13,8 +13,10 @@ public class User {
     private String name;
     private String email;
     private String bio;
-    private String picture; // Base64 string or URL
-    private String password; // Hashed for manual registration
+    private String picture;
+    private String password;
     private String provider;
-    private String providerId; // OAuth2 provider ID
+    private Role role = Role.USER;
+    private Boolean isVerified = false;
+    private String providerId;
 }

@@ -4,21 +4,22 @@ import com.backend.config.exception.EmptyFieldException;
 import com.backend.config.exception.PasswordOrEmailException;
 import com.backend.config.exception.UserAlreadyExistException;
 import com.backend.config.exception.UserNotFoundException;
-import com.backend.config.security.JwtTokenProvider;
 import com.backend.dto.UserDTO;
 import com.backend.model.email.MagicLink;
 import com.backend.model.user.User;
 import com.backend.repository.mail.MagicLinkRepository;
 import com.backend.repository.user.UserRepository;
 import com.backend.service.email.EmailServiceImpl;
+import com.backend.shared.PasswordUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.security.SecureRandom;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
@@ -33,9 +34,6 @@ public class AuthServiceImpl implements AuthService {
     private MagicLinkRepository magicLinkRepository;
 
     @Autowired
-    private JwtTokenProvider jwtTokenProvider;
-
-    @Autowired
     private EmailServiceImpl emailService;
 
     private final ModelMapper modelMapper = new ModelMapper();
@@ -46,19 +44,24 @@ public class AuthServiceImpl implements AuthService {
     @Value("${jwt.magic-link-expiration}")
     private Long magicLinkExpiration;
 
-    boolean isValidEmail(String email) {
+    private boolean isValidEmail(String email) {
         return email.contains("@") && email.contains(".");
     }
 
-    private String encryptPassword(String password) {
-        BCryptPasswordEncoder bCryptPasswordEncoder = new BCryptPasswordEncoder();
-        return bCryptPasswordEncoder.encode(password);
+    private String generateSecureLink() {
+        SecureRandom secureRandom = new SecureRandom();
+        byte[] linkBytes = new byte[32];
+        secureRandom.nextBytes(linkBytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(linkBytes);
     }
 
     private boolean isStrongPassword(String password) {
         String passwordRegex = "^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z]).{8,}$";
-        Pattern pattern = Pattern.compile(passwordRegex);
-        return pattern.matcher(password).matches();
+        return Pattern.compile(passwordRegex).matcher(password).matches();
+    }
+
+    public boolean existsByUsername(String username) {
+        return userRepository.findByUsername(username).isPresent();
     }
 
     public boolean existByEmail(String email) {
@@ -88,23 +91,22 @@ public class AuthServiceImpl implements AuthService {
         if (existByEmail(userDTO.getEmail())) {
             throw new UserAlreadyExistException("Email already exists");
         }
+        if (existsByUsername(userDTO.getUsername())) {
+            throw new UserAlreadyExistException("Username already exists");
+        }
+
         User user = new User();
         modelMapper.map(userDTO, user);
-        user.setPassword(encryptPassword(userDTO.getPassword()));
-        user.setProvider("manual");
-        User savedUser;
+        user.setPassword(PasswordUtil.encryptPassword(userDTO.getPassword()));
+        user.setProvider("manual system");
+
         try {
-            savedUser = userRepository.save(user);
+            User savedUser = userRepository.save(user);
             log.info("Successfully saved user --> id={}, email={}", savedUser.getId(), savedUser.getEmail());
-        } catch (Exception e) {
-            log.error("Failed to save user: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to save user to MongoDB", e);
-        }
-        try {
             requestMagicLink(savedUser.getEmail());
         } catch (Exception e) {
-            log.error("Magic link email failed to send to {}: {}", savedUser.getEmail(), e.getMessage(), e);
-            throw new RuntimeException("Failed to send magic link. User not saved.", e);
+            log.error("Registration failed: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to save user or send magic link", e);
         }
     }
 
@@ -133,36 +135,36 @@ public class AuthServiceImpl implements AuthService {
             throw new UserNotFoundException("User not found with email: " + email);
         }
 
-        String token = jwtTokenProvider.generateMagicLinkToken(email);
+        String token = generateSecureLink();
         MagicLink magicLink = new MagicLink();
         magicLink.setUserId(userOpt.get().getId());
-        magicLink.setToken(token);
+        magicLink.setLink(token);
         magicLink.setExpiresAt(Instant.now().plusMillis(magicLinkExpiration));
         magicLinkRepository.save(magicLink);
 
-        String link = String.format("%s/auth/login?token=%s", frontendUrl, token);
+        String link = String.format("%s/auth/login?magic-link=%s", frontendUrl, token);
         emailService.sendMagicLink(email, link);
         log.info("Magic link sent to {} with token: {}", email, token);
     }
 
     @Override
-    public UserDTO validateMagicLink(String token) {
-        if (!jwtTokenProvider.validateToken(token)) {
-            throw new RuntimeException("Invalid or expired magic link");
-        }
-
-        Optional<MagicLink> magicLinkOpt = magicLinkRepository.findByToken(token);
+    public String validateMagicLink(String link) {
+        Optional<MagicLink> magicLinkOpt = magicLinkRepository.findByLink(link);
         if (magicLinkOpt.isEmpty() || magicLinkOpt.get().getExpiresAt().isBefore(Instant.now())) {
             throw new RuntimeException("Magic link expired or not found");
         }
 
-        String email = jwtTokenProvider.getUsernameFromJWT(token);
-        Optional<User> userOpt = userRepository.findByEmail(email);
+        String userId = magicLinkOpt.get().getUserId();
+        Optional<User> userOpt = userRepository.findById(userId);
         if (userOpt.isEmpty()) {
-            throw new UserNotFoundException("User not found with email: " + email);
+            throw new UserNotFoundException("User not found with id: " + userId);
         }
 
+        User user = userOpt.get();
+        user.setIsVerified(true);
+        userRepository.save(user);
+
         magicLinkRepository.delete(magicLinkOpt.get());
-        return modelMapper.map(userOpt.get(), UserDTO.class);
+        return link;
     }
 }

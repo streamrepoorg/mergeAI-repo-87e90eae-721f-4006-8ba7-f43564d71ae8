@@ -8,5 +8,5 @@ import java.util.Optional;
 
 @Repository
 public interface MagicLinkRepository extends MongoRepository<MagicLink, String> {
-    Optional<MagicLink> findByToken(String token);
+    Optional<MagicLink> findByLink(String link);
 }
