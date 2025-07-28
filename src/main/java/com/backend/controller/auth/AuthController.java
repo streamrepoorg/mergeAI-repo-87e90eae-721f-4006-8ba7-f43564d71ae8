@@ -8,6 +8,7 @@ import com.backend.config.security.JwtTokenProvider;
 import com.backend.dto.UserDTO;
 import com.backend.dto.request.MagicLinkRequest;
 import com.backend.dto.response.JwtResponse;
+import com.backend.dto.response.LoginResponse;
 import com.backend.dto.response.ResponseDetails;
 import com.backend.service.auth.AuthServiceImpl;
 import jakarta.validation.Valid;
@@ -23,11 +24,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 
 import java.time.LocalDateTime;
-import java.util.Collections;
 
 @RestController
 @RequestMapping("/api/auth")
 @Slf4j
+//@CrossOrigin(originPatterns = "*")
 public class AuthController {
 
     @Autowired
@@ -62,15 +63,15 @@ public class AuthController {
     public ResponseEntity<?> login(@Valid @RequestBody UserDTO userDTO) {
         try {
             log.info("Logging in user: {}", userDTO.getUsername());
-            Authentication authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(userDTO.getUsername(), userDTO.getPassword()));
+            Authentication authentication = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(userDTO.getUsername(), userDTO.getPassword()));
             String token = jwtTokenProvider.generateToken(authentication);
             ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "Login successful", HttpStatus.OK.toString());
-            return ResponseEntity.status(200).body(new JwtResponse(token));
+            LoginResponse loginResponse = new LoginResponse(token, responseDetails);
+            return ResponseEntity.ok(loginResponse);
         } catch (Exception e) {
             log.error("Login failed for user: {}", userDTO.getUsername(), e);
             ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "Invalid credentials", HttpStatus.UNAUTHORIZED.toString());
-            return ResponseEntity.status(401).body(responseDetails);
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseDetails);
         }
     }
 

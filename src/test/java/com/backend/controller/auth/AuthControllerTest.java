@@ -144,7 +144,7 @@ public class AuthControllerTest {
     }
 
     @Test
-    public void test_requestMagicLinkSuccess() throws Exception {
+    public void test_requestMagicLinkIsSuccess() throws Exception {
         MagicLinkRequest request = new MagicLinkRequest();
         request.setEmail("okoroaforkelechi123@gmail.com");
         doNothing().when(authService).requestMagicLink(anyString());
