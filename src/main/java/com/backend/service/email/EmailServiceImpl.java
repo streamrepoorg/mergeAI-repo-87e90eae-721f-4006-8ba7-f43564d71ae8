@@ -20,7 +20,7 @@ public class EmailServiceImpl implements EmailService {
     public void sendMagicLink(String email, String link) {
         String subject = "streamRepo Magic Link";
         String htmlContent = "<h1>Hi,</h1>" +
-                "<p>Welcome to streamRepo! We're thrilled to have you on board. To get started, click the link below to log in to your new account. This magic link is valid for the next 3 minutes:</p>" +
+                "<p>Welcome to streamRepo! We're thrilled to have you on board. To get started, click the link below to log in to your new account. This magic link is valid for the next 5 minutes:</p>" +
                 "<a href=\"" + link + "\" style=\"display: inline-block; padding: 10px 20px; background-color: #007BFF; color: white; text-decoration: none; border-radius: 5px;\">Login Now</a>" +
                 "<p>Best,<br>The streamRepo Team</p>" +
                 "<p><strong>Need help?</strong><br>If you have any questions, contact us at <a href=\"mailto:okoroaforkelechi123@gmail.com\">support@streamrepo.com</a>.</p>" +
