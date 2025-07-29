@@ -45,7 +45,7 @@ public class AuthServiceImpl implements AuthService {
     private Long magicLinkExpiration;
 
     private boolean isValidEmail(String email) {
-        return email.contains("@") && email.contains(".");
+        return !email.contains("@") || !email.contains(".");
     }
 
     private String generateSecureLink() {
@@ -79,7 +79,7 @@ public class AuthServiceImpl implements AuthService {
         if (userDTO.getPassword() == null || userDTO.getPassword().isEmpty()) {
             throw new EmptyFieldException("Password cannot be empty");
         }
-        if (!isValidEmail(userDTO.getEmail())) {
+        if (isValidEmail(userDTO.getEmail())) {
             throw new UserNotFoundException("User email is invalid.");
         }
         if (!isStrongPassword(userDTO.getPassword())) {
@@ -88,18 +88,31 @@ public class AuthServiceImpl implements AuthService {
             }
             throw new PasswordOrEmailException("Password is too weak.", new Throwable("Invalid password strength"));
         }
-        if (existByEmail(userDTO.getEmail())) {
-            throw new UserAlreadyExistException("Email already exists");
-        }
         if (existsByUsername(userDTO.getUsername())) {
             throw new UserAlreadyExistException("Username already exists");
+        }
+        if (existByEmail(userDTO.getEmail())) {
+            User existingUser = userRepository.findByEmail(userDTO.getEmail()).orElseThrow(() -> new RuntimeException("User with email exists but could not be retrieved"));
+
+            if (existingUser.getIsVerified() == true) {
+                throw new UserAlreadyExistException("User is already verified. Please log in");
+            } else {
+                try {
+                    requestMagicLink(existingUser.getEmail());
+                    log.info("Sent new magic link to unverified user: email={}", existingUser.getEmail());
+                    return;
+                } catch (Exception e) {
+                    log.error("Failed to send new magic link: {}", e.getMessage(), e);
+                    throw new RuntimeException("Failed to send new magic link", e);
+                }
+            }
         }
 
         User user = new User();
         modelMapper.map(userDTO, user);
         user.setPassword(PasswordUtil.encryptPassword(userDTO.getPassword()));
         user.setProvider("manual system");
-
+        user.setIsVerified(false);
         try {
             User savedUser = userRepository.save(user);
             log.info("Successfully saved user --> id={}, email={}", savedUser.getId(), savedUser.getEmail());
@@ -112,21 +125,44 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public UserDTO handleOAuth2User(String provider, String providerId, String email, String name, String picture) {
+        if (provider == null || providerId == null) {
+            throw new IllegalArgumentException("Provider or providerId cannot be null");
+        }
+        if (email == null || isValidEmail(email)) {
+            throw new IllegalArgumentException("Valid email is required for OAuth2 registration");
+        }
+
         Optional<User> existingUser = userRepository.findByProviderAndProviderId(provider, providerId);
         if (existingUser.isPresent()) {
-            return modelMapper.map(existingUser.get(), UserDTO.class);
+            User user = existingUser.get();
+            user.setName(name != null ? name : user.getName());
+            user.setPicture(picture != null ? picture : user.getPicture());
+            userRepository.save(user);
+            return modelMapper.map(user, UserDTO.class);
         }
 
         User user = new User();
         user.setProvider(provider);
         user.setProviderId(providerId);
         user.setEmail(email);
-        user.setName(name);
+        user.setName(name != null ? name : "Unknown");
         user.setPicture(picture);
-        user.setUsername(email.split("@")[0]);
+        user.setUsername(generateUniqueUsername(email));
+        user.setIsVerified(true);
         user = userRepository.save(user);
         return modelMapper.map(user, UserDTO.class);
     }
+
+    private String generateUniqueUsername(String email) {
+        String baseUsername = email.split("@")[0];
+        String username = baseUsername;
+        int counter = 1;
+        while (existsByUsername(username)) {
+            username = baseUsername + counter++;
+        }
+        return username;
+    }
+
 
     @Override
     public void requestMagicLink(String email) {

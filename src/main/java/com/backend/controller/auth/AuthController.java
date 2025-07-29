@@ -11,6 +11,7 @@ import com.backend.dto.response.JwtResponse;
 import com.backend.dto.response.LoginResponse;
 import com.backend.dto.response.ResponseDetails;
 import com.backend.service.auth.AuthServiceImpl;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -23,6 +24,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 
 @RestController
@@ -103,13 +105,11 @@ public class AuthController {
     }
 
     @GetMapping("/oauth2/success")
-    public ResponseEntity<?> oauth2Success(OAuth2AuthenticationToken authentication) {
+    public void oauth2Success(OAuth2AuthenticationToken authentication, HttpServletResponse response) throws IOException {
         try {
             log.info("Processing OAuth2 login for provider: {}", authentication.getAuthorizedClientRegistrationId());
             String provider = authentication.getAuthorizedClientRegistrationId();
-            String providerId = authentication.getPrincipal().getAttribute("sub") != null ?
-                    authentication.getPrincipal().getAttribute("sub") :
-                    authentication.getPrincipal().getAttribute("id");
+            String providerId = authentication.getPrincipal().getAttribute("sub") != null ? authentication.getPrincipal().getAttribute("sub") : authentication.getPrincipal().getAttribute("id");
             String email = authentication.getPrincipal().getAttribute("email");
             String name = authentication.getPrincipal().getAttribute("name");
             String picture = authentication.getPrincipal().getAttribute("picture");
@@ -117,12 +117,11 @@ public class AuthController {
             UserDTO userDTO = authService.handleOAuth2User(provider, providerId, email, name, picture);
             Authentication auth = new UsernamePasswordAuthenticationToken(userDTO.getUsername(), null, authentication.getAuthorities());
             String token = jwtTokenProvider.generateToken(auth);
-            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "OAuth2 login successful", HttpStatus.OK.toString());
-            return ResponseEntity.status(200).body(new JwtResponse(token));
+            String redirectUrl = String.format("%s/auth/callback?token=%s", "https://stream-repo-frontend.vercel.app", token);
+            response.sendRedirect(redirectUrl);
         } catch (Exception e) {
             log.error("OAuth2 login failed: {}", e.getMessage());
-            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "OAuth2 login failed", HttpStatus.INTERNAL_SERVER_ERROR.toString());
-            return ResponseEntity.status(500).body(responseDetails);
+//            response.sendRedirect("https://stream-repo-frontend.vercel.app/auth/callback?error=OAuth2 login failed");
         }
     }
 }
