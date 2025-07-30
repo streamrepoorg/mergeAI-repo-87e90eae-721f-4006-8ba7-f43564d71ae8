@@ -177,11 +177,10 @@ public class AuthServiceImpl implements AuthService {
         magicLink.setExpiresAt(Instant.now().plusMillis(magicLinkExpiration));
         magicLinkRepository.save(magicLink);
 
-        String link = String.format("%s/auth/login?magic-link=%s", frontendUrl, token);
+        String link = String.format("%s/auth/magic-link/validatelink\n=%s", frontendUrl, token);
         emailService.sendMagicLink(email, link);
         log.info("Magic link sent to {} with token: {}", email, token);
     }
-
     @Override
     public String validateMagicLink(String link) {
         Optional<MagicLink> magicLinkOpt = magicLinkRepository.findByLink(link);
