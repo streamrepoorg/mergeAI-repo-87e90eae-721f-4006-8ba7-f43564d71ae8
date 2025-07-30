@@ -7,7 +7,6 @@ import com.backend.config.exception.UserNotFoundException;
 import com.backend.config.security.JwtTokenProvider;
 import com.backend.dto.UserDTO;
 import com.backend.dto.request.MagicLinkRequest;
-import com.backend.dto.response.JwtResponse;
 import com.backend.dto.response.LoginResponse;
 import com.backend.dto.response.ResponseDetails;
 import com.backend.service.auth.AuthServiceImpl;
@@ -30,7 +29,6 @@ import java.time.LocalDateTime;
 @RestController
 @RequestMapping("/api/auth")
 @Slf4j
-//@CrossOrigin(originPatterns = "*")
 public class AuthController {
 
     @Autowired
