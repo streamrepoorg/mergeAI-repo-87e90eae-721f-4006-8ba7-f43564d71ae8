@@ -163,7 +163,6 @@ public class AuthServiceImpl implements AuthService {
         return username;
     }
 
-
     @Override
     public void requestMagicLink(String email) {
         Optional<User> userOpt = userRepository.findByEmail(email);
@@ -189,17 +188,14 @@ public class AuthServiceImpl implements AuthService {
         if (magicLinkOpt.isEmpty() || magicLinkOpt.get().getExpiresAt().isBefore(Instant.now())) {
             throw new RuntimeException("Magic link expired or not found");
         }
-
         String userId = magicLinkOpt.get().getUserId();
         Optional<User> userOpt = userRepository.findById(userId);
         if (userOpt.isEmpty()) {
             throw new UserNotFoundException("User not found with id: " + userId);
         }
-
         User user = userOpt.get();
         user.setIsVerified(true);
         userRepository.save(user);
-
         magicLinkRepository.delete(magicLinkOpt.get());
         return link;
     }
