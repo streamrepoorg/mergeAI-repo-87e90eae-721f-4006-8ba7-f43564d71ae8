@@ -14,11 +14,20 @@ import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
@@ -31,6 +40,9 @@ public class AuthServiceImpl implements AuthService {
 
     @Autowired
     private MagicLinkRepository magicLinkRepository;
+
+    @Autowired
+    private RestTemplate restTemplate;
 
     @Autowired
     private PasswordResetRepository passwordResetRepository;
@@ -149,12 +161,46 @@ public class AuthServiceImpl implements AuthService {
         user.setProvider(provider);
         user.setProviderId(providerId);
         user.setEmail(email);
-        user.setName(name != null ? name : "Unknown");
+        user.setName(name != null ? name : "Github User");
         user.setPicture(picture);
         user.setUsername(generateUniqueUsername(email));
         user.setIsVerified(true);
         user = userRepository.save(user);
         return modelMapper.map(user, UserDTO.class);
+    }
+
+    @Override
+    public UserDTO handleOAuth2Redirect(OAuth2AuthenticationToken authentication) {
+        log.info("Processing OAuth2 redirect for provider: {}", authentication.getAuthorizedClientRegistrationId());
+        String provider = authentication.getAuthorizedClientRegistrationId();
+        String providerId = authentication.getPrincipal().getAttribute("id");
+        String email = authentication.getPrincipal().getAttribute("email");
+        String name = authentication.getPrincipal().getAttribute("name");
+        String picture = authentication.getPrincipal().getAttribute("avatar_url");
+//        String login = authentication.getPrincipal().getAttribute("login");
+        if (email == null) {
+            String accessToken = authentication.getPrincipal().getAttribute("access_token");
+            email = fetchGitHubEmail(accessToken);
+        }
+        return handleOAuth2User(provider, providerId, email, name, picture);
+    }
+
+//    This will let GitHub API to retrieve the user’s email if the OAuth2 response lacks it (If the user email is private)
+    private String fetchGitHubEmail(String accessToken) {
+        String url = "https://api.github.com/user/emails";
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(accessToken);
+        HttpEntity<?> entity = new HttpEntity<>(headers);
+        ResponseEntity<List<Map<String, Object>>> response = restTemplate.exchange(url, HttpMethod.GET, entity, new ParameterizedTypeReference<>() {});
+        List<Map<String, Object>> emails = response.getBody();
+        if (emails != null) {
+            for (Map<String, Object> emailData : emails) {
+                if (Boolean.TRUE.equals(emailData.get("primary")) && Boolean.TRUE.equals(emailData.get("verified"))) {
+                    return (String) emailData.get("email");
+                }
+            }
+        }
+        throw new IllegalArgumentException("No verified email found for GitHub user");
     }
 
     private String generateUniqueUsername(String email) {
@@ -174,20 +220,20 @@ public class AuthServiceImpl implements AuthService {
             throw new UserNotFoundException("User not found with email: " + email);
         }
 
-        String token = generateSecureLink();
+        String securedLink = generateSecureLink();
         MagicLink magicLink = new MagicLink();
         magicLink.setUserId(userOpt.get().getId());
-        magicLink.setLink(token);
+        magicLink.setLink(securedLink);
         magicLink.setExpiresAt(Instant.now().plusMillis(magicLinkExpiration));
         magicLinkRepository.save(magicLink);
 
-        String link = String.format("%s/auth/magic-link/validatelink?magic-link\n=%s", frontendUrl, token);
+        String link = String.format("%s/auth/magic-link/validatelink?magic-link\n=%s", frontendUrl, securedLink);
         emailService.sendMagicLink(email, link);
-        log.info("Magic link sent to {} with token: {}", email, token);
+        log.info("Magic link sent to {} with securedLink: {}", email, securedLink);
     }
 
     @Override
-    public String validateMagicLink(String link) {
+    public void validateMagicLink(String link) {
         Optional<MagicLink> magicLinkOpt = magicLinkRepository.findByLink(link);
         if (magicLinkOpt.isEmpty() || magicLinkOpt.get().getExpiresAt().isBefore(Instant.now())) {
             throw new RuntimeException("Magic link expired or not found");
@@ -201,7 +247,6 @@ public class AuthServiceImpl implements AuthService {
         user.setIsVerified(true);
         userRepository.save(user);
         magicLinkRepository.delete(magicLinkOpt.get());
-        return link;
     }
 
     public void requestPasswordReset(String email) {

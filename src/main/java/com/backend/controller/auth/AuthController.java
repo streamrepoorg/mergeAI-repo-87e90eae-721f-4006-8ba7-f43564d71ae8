@@ -103,23 +103,14 @@ public class AuthController {
         }
     }
 
-    @GetMapping("/oauth2/success")
-    public void oauth2Success(OAuth2AuthenticationToken authentication, HttpServletResponse response) throws IOException {
+    @GetMapping("/oauth2/github")
+    public void oauth2Github(OAuth2AuthenticationToken authentication, HttpServletResponse response) throws IOException {
         try {
-            log.info("Processing OAuth2 login for provider: {}", authentication.getAuthorizedClientRegistrationId());
-            String provider = authentication.getAuthorizedClientRegistrationId();
-            String providerId = authentication.getPrincipal().getAttribute("sub") != null ? authentication.getPrincipal().getAttribute("sub") : authentication.getPrincipal().getAttribute("id");
-            String email = authentication.getPrincipal().getAttribute("email");
-            String name = authentication.getPrincipal().getAttribute("name");
-            String picture = authentication.getPrincipal().getAttribute("picture");
-
-            UserDTO userDTO = authService.handleOAuth2User(provider, providerId, email, name, picture);
-            Authentication auth = new UsernamePasswordAuthenticationToken(userDTO.getUsername(), null, authentication.getAuthorities());
-            String token = jwtTokenProvider.generateToken(auth);
-            String redirectUrl = String.format("%s/auth/callback?token=%s", "https://stream-repo-frontend.vercel.app", token);
+            String redirectUrl = String.valueOf(authService.handleOAuth2Redirect(authentication));
             response.sendRedirect(redirectUrl);
         } catch (Exception e) {
             log.error("OAuth2 login failed: {}", e.getMessage());
+            response.sendError(HttpStatus.INTERNAL_SERVER_ERROR.value(), "OAuth2 login failed: " + e.getMessage());
         }
     }
 
