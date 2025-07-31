@@ -1,13 +1,12 @@
 package com.backend.service.auth;
 
-import com.backend.config.exception.EmptyFieldException;
-import com.backend.config.exception.PasswordOrEmailException;
-import com.backend.config.exception.UserAlreadyExistException;
-import com.backend.config.exception.UserNotFoundException;
+import com.backend.config.exception.*;
 import com.backend.dto.UserDTO;
 import com.backend.model.email.MagicLink;
+import com.backend.model.email.PasswordResetLink;
 import com.backend.model.user.User;
 import com.backend.repository.mail.MagicLinkRepository;
+import com.backend.repository.mail.PasswordResetRepository;
 import com.backend.repository.user.UserRepository;
 import com.backend.service.email.EmailServiceImpl;
 import com.backend.shared.PasswordUtil;
@@ -34,12 +33,18 @@ public class AuthServiceImpl implements AuthService {
     private MagicLinkRepository magicLinkRepository;
 
     @Autowired
+    private PasswordResetRepository passwordResetRepository;
+
+    @Autowired
     private EmailServiceImpl emailService;
 
     private final ModelMapper modelMapper = new ModelMapper();
 
     @Value("${frontend.url}")
     private String frontendUrl;
+
+    @Value("${jwt.password-reset-expiration}")
+    private Long passwordResetExpiration;
 
     @Value("${jwt.magic-link-expiration}")
     private Long magicLinkExpiration;
@@ -57,7 +62,7 @@ public class AuthServiceImpl implements AuthService {
 
     private boolean isStrongPassword(String password) {
         String passwordRegex = "^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z]).{8,}$";
-        return Pattern.compile(passwordRegex).matcher(password).matches();
+        return !Pattern.compile(passwordRegex).matcher(password).matches();
     }
 
     public boolean existsByUsername(String username) {
@@ -82,7 +87,7 @@ public class AuthServiceImpl implements AuthService {
         if (isValidEmail(userDTO.getEmail())) {
             throw new UserNotFoundException("User email is invalid.");
         }
-        if (!isStrongPassword(userDTO.getPassword())) {
+        if (isStrongPassword(userDTO.getPassword())) {
             if (userDTO.getPassword().length() < 5) {
                 throw new PasswordOrEmailException("Password should be at least 5 characters.", new Throwable("Invalid password length"));
             }
@@ -93,7 +98,6 @@ public class AuthServiceImpl implements AuthService {
         }
         if (existByEmail(userDTO.getEmail())) {
             User existingUser = userRepository.findByEmail(userDTO.getEmail()).orElseThrow(() -> new RuntimeException("User with email exists but could not be retrieved"));
-
             if (existingUser.getIsVerified() == true) {
                 throw new UserAlreadyExistException("User is already verified. Please log in");
             } else {
@@ -181,6 +185,7 @@ public class AuthServiceImpl implements AuthService {
         emailService.sendMagicLink(email, link);
         log.info("Magic link sent to {} with token: {}", email, token);
     }
+
     @Override
     public String validateMagicLink(String link) {
         Optional<MagicLink> magicLinkOpt = magicLinkRepository.findByLink(link);
@@ -197,5 +202,51 @@ public class AuthServiceImpl implements AuthService {
         userRepository.save(user);
         magicLinkRepository.delete(magicLinkOpt.get());
         return link;
+    }
+
+    public void requestPasswordReset(String email) {
+        Optional<User> userOpt = userRepository.findByEmail(email);
+        if (userOpt.isEmpty()) {
+            throw new UserNotFoundException("User not found with email: " + email);
+        }
+        User user = userOpt.get();
+        if (!user.getIsVerified()) {
+            throw new UserNotVerified("User account is not verified");
+        }
+
+        String token = generateSecureLink();
+        PasswordResetLink resetToken = new PasswordResetLink();
+        resetToken.setUserId(user.getId());
+        resetToken.setLink(token);
+        resetToken.setExpiresAt(Instant.now().plusMillis(passwordResetExpiration));
+        passwordResetRepository.save(resetToken);
+
+        String link = String.format("%s/auth/reset-password?token=%s", frontendUrl, token);
+        emailService.sendPasswordResetLink(email, link);
+        log.info("Password reset link sent to {} with token: {}", email, token);
+    }
+
+    public void resetPassword(String link, String newPassword) {
+        Optional<PasswordResetLink> resetTokenOpt = passwordResetRepository.findByLink(link);
+        if (resetTokenOpt.isEmpty() || resetTokenOpt.get().getExpiresAt().isBefore(Instant.now())) {
+            throw new RuntimeException("Password reset token expired or not found");
+        }
+        String userId = resetTokenOpt.get().getUserId();
+        Optional<User> userOpt = userRepository.findById(userId);
+        if (userOpt.isEmpty()) {
+            throw new UserNotFoundException("User not found with id: " + userId);
+        }
+        if (isStrongPassword(newPassword)) {
+            if (newPassword.length() < 5) {
+                throw new PasswordOrEmailException("Password should be at least 5 characters.", new Throwable("Invalid password length"));
+            }
+            throw new PasswordOrEmailException("Password is too weak.", new Throwable("Invalid password strength"));
+        }
+
+        User user = userOpt.get();
+        user.setPassword(PasswordUtil.encryptPassword(newPassword));
+        userRepository.save(user);
+        passwordResetRepository.delete(resetTokenOpt.get());
+        log.info("Password successfully reset for user: {}", user.getEmail());
     }
 }

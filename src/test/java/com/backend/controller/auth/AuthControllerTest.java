@@ -3,6 +3,7 @@ package com.backend.controller.auth;
 import com.backend.config.security.JwtTokenProvider;
 import com.backend.dto.UserDTO;
 import com.backend.dto.request.MagicLinkRequest;
+import com.backend.dto.request.PasswordResetRequest;
 import com.backend.service.auth.AuthServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -74,7 +75,7 @@ public class AuthControllerTest {
 
     @Test
     public void testValidateMagicLinkSuccess() throws Exception {
-        String validMagicLink = "pdZHp_KvX3n8pdrx_16FiYB9lFawILZkVfnE_WsWU_A";
+        String validMagicLink = "7pPaTXs-T2Hy5taRpTrbbksq7AH-BETTYUUig6XL7zE";
         mockMvc.perform(get("/api/auth/validate-magic-link")
                         .param("link", validMagicLink))
                 .andExpect(status().isCreated())
@@ -83,7 +84,6 @@ public class AuthControllerTest {
 
     @Test
     public void testLoginSuccess() throws Exception {
-//        Login token eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJva29yb2Fmb3JrZWxlY2hpMTIzQGdtYWlsLmNvbSIsInJvbGV
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(userDTO)))
@@ -91,33 +91,26 @@ public class AuthControllerTest {
                 .andExpect(jsonPath("$.token").exists());
     }
 
-//    @Test
-//    public void testOAuth2Success() throws Exception {
-//        // Prepare OAuth2 user attributes
-//        Map<String, Object> attributes = new HashMap<>();
-//        attributes.put("sub", "123456789");
-//        attributes.put("email", "okoroaforkelechi123@gmail.com");
-//        attributes.put("name", "Kelechi Divine");
-//        attributes.put("picture", "https://example.com/picture.jpg");
-//
-//        OAuth2User oAuth2User = new DefaultOAuth2User(null, attributes, "sub");
-//        OAuth2AuthenticationToken authToken = new OAuth2AuthenticationToken(
-//                oAuth2User, null, "github");
-//
-//        when(authService.handleOAuth2User(
-//                eq("github"),
-//                eq("123456789"),
-//                eq("okoroaforkelechi123@gmail.com"),
-//                eq("Kelechi Divine"),
-//                eq("https://example.com/picture.jpg")
-//        )).thenReturn(userDTO);
-//
-//        when(jwtTokenProvider.generateToken(any())).thenReturn("mocked-jwt-token");
-//
-//        // Perform the request with mocked OAuth2 authentication
-//        mockMvc.perform(get("/api/auth/oauth2/success")
-//                        .with((RequestPostProcessor) authentication(authToken)))
-//                .andExpect(status().is3xxRedirection())
-//                .andExpect(redirectedUrl("https://stream-repo-frontend.vercel.app/auth/callback?token=mocked-jwt-token"));
-//    }
+    @Test
+    public void testRequestPasswordResetSuccess() throws Exception {
+        MagicLinkRequest passwordResetRequest = new MagicLinkRequest();
+        passwordResetRequest.setEmail(userDTO.getEmail());
+        mockMvc.perform(post("/api/auth/forgot-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(passwordResetRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Password reset link sent to email"));
+    }
+
+    @Test
+    public void testResetPasswordSuccess() throws Exception {
+        PasswordResetRequest resetRequest = new PasswordResetRequest();
+        resetRequest.setLink("zV4Ss-HaJwjXYmXXqFilX46so4vov7_nAZmYg9uaMAs");
+        resetRequest.setNewPassword("NewStrongPassword128@#3@");
+        mockMvc.perform(post("/api/auth/reset-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(resetRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Password reset successful"));
+    }
 }
