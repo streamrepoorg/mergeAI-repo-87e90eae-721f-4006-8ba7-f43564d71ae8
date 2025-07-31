@@ -344,6 +344,4 @@ curl -X POST https://stream-repo-l30u.onrender.com/api/auth/reset-password \
 ## Notes
 - **Security**: Passwords are encrypted; magic links and reset tokens are time-limited.
 - **Timeouts**: 20-second timeout for database/email operations.
-- **Testing**: Use Postman or cURL with proper JSON formatting.
-- **OAuth2**: Supports GitHub; other providers may be added.
 
