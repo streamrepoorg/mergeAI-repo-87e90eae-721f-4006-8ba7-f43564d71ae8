@@ -429,13 +429,13 @@ curl -X GET "https://stream-repo-l30u.onrender.com/api/auth/validate-magic-link?
 
 ---
 
-## 5. OAuth2 Success Endpoint
+## 5. OAuth2 with Github Endpoint
 ### Overview
-The OAuth2 Success API is a GET endpoint that handles successful OAuth2 authentication, generating a JWT token and redirecting the user to the frontend with the token.
+The OAuth2 Github API is a GET endpoint that handles successful OAuth2 authentication, generating a JWT token and redirecting the user to the frontend with the token.
 
 ### Endpoint
 ```
-GET /api/auth/oauth2/success
+GET /api/auth/oauth2/github
 ```
 
 ### Purpose
@@ -444,7 +444,7 @@ This endpoint processes OAuth2 authentication results, creates or updates a user
 ### Request Structure
 #### Query Parameters
 This endpoint is called automatically by the OAuth2 provider and does not require manual query parameters. It uses the `OAuth2AuthenticationToken` provided by the OAuth2 flow, which includes:
-- Provider (e.g., Google, GitHub)
+- Provider (GitHub)
 - Provider ID
 - Email
 - Name
