@@ -7,6 +7,7 @@ import com.backend.config.exception.UserNotFoundException;
 import com.backend.config.security.JwtTokenProvider;
 import com.backend.dto.UserDTO;
 import com.backend.dto.request.MagicLinkRequest;
+import com.backend.dto.request.PasswordResetRequest;
 import com.backend.dto.response.LoginResponse;
 import com.backend.dto.response.ResponseDetails;
 import com.backend.service.auth.AuthServiceImpl;
@@ -119,7 +120,42 @@ public class AuthController {
             response.sendRedirect(redirectUrl);
         } catch (Exception e) {
             log.error("OAuth2 login failed: {}", e.getMessage());
-//            response.sendRedirect("https://stream-repo-frontend.vercel.app/auth/callback?error=OAuth2 login failed");
+        }
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> requestPasswordReset(@Valid @RequestBody MagicLinkRequest request) {
+        try {
+            log.info("Requesting password reset for email: {}", request.getEmail());
+            authService.requestPasswordReset(request.getEmail());
+            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "Password reset link sent to email", HttpStatus.OK.toString());
+            return ResponseEntity.status(200).body(responseDetails);
+        } catch (UserNotFoundException e) {
+            log.error("Failed to send password reset link: {}", e.getMessage());
+            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "User not found", HttpStatus.BAD_REQUEST.toString());
+            return ResponseEntity.status(400).body(responseDetails);
+        } catch (Exception e) {
+            log.error("Unexpected error during password reset request: {}", e.getMessage());
+            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "Failed to process password reset request", HttpStatus.INTERNAL_SERVER_ERROR.toString());
+            return ResponseEntity.status(500).body(responseDetails);
+        }
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@Valid @RequestBody PasswordResetRequest request) {
+        try {
+            log.info("Resetting password for token");
+            authService.resetPassword(request.getLink(), request.getNewPassword());
+            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "Password reset successful", HttpStatus.OK.toString());
+            return ResponseEntity.status(200).body(responseDetails);
+        } catch (PasswordOrEmailException e) {
+            log.error("Password reset failed: {}", e.getMessage());
+            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), e.getMessage(), HttpStatus.BAD_REQUEST.toString());
+            return ResponseEntity.status(400).body(responseDetails);
+        } catch (Exception e) {
+            log.error("Unexpected error during password reset: {}", e.getMessage());
+            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "Invalid or expired reset token", HttpStatus.BAD_REQUEST.toString());
+            return ResponseEntity.status(400).body(responseDetails);
         }
     }
 }
