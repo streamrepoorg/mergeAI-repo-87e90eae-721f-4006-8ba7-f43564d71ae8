@@ -1,7 +1,3 @@
-Below is a concise README in Markdown format that documents each endpoint in the provided `AuthController` class. The README is structured to clearly describe the purpose, request structure, response structure, and example usage for each endpoint, following the style of the example you provided but tailored to be shorter and focused. Since you requested a "short readme for each endpoint," I’ll avoid redundancy and keep the descriptions clear, detailed, and lively, as per your response style preference.
-
-
-
 # StreamRepo API Authentication Endpoints
 
 This README documents the authentication endpoints for the StreamRepo API, accessible under the base URL `https://stream-repo-l30u.onrender.com/api/auth`. These endpoints handle user registration, login, magic link operations, OAuth2 authentication, and password resets.
