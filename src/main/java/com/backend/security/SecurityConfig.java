@@ -46,7 +46,7 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/register", "/api/auth/oauth2/github", "/api/auth/login", "/api/auth/magic-link", "/api/auth/validate-magic-link").permitAll()
+                        .requestMatchers("/api/auth/register", "/api/auth/oauth2/github", "/api/auth/login", "/api/auth/magic-link", "/api/auth/validate-magic-link", "/oauth2/authorization/**").permitAll()
                         .requestMatchers("/api/auth/**").hasAnyRole("USER", "ADMIN")
                         .anyRequest().authenticated()
                 )
