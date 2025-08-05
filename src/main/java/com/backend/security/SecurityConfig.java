@@ -58,8 +58,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").hasAnyRole("USER", "ADMIN")
                         .anyRequest().authenticated()
                 )
-                .oauth2Login(Customizer.withDefaults())
-                .headers(headers -> headers
+                .oauth2Login(oauth2 -> oauth2
+                        .redirectionEndpoint(redirection -> redirection
+                                .baseUri("/login/oauth2/code/*"))
+                )                .headers(headers -> headers
                         .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'; script-src 'self' 'unsafe-inline'; object-src 'none'; frame-ancestors 'none';"))
                         .httpStrictTransportSecurity(hsts -> hsts
                                 .includeSubDomains(true)
