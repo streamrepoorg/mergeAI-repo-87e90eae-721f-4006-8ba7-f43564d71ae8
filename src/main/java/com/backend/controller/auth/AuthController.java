@@ -1,10 +1,10 @@
 package com.backend.controller.auth;
 
-import com.backend.config.exception.EmptyFieldException;
-import com.backend.config.exception.PasswordOrEmailException;
-import com.backend.config.exception.UserAlreadyExistException;
-import com.backend.config.exception.UserNotFoundException;
-import com.backend.config.security.JwtTokenProvider;
+import com.backend.shared.exception.EmptyFieldException;
+import com.backend.shared.exception.PasswordOrEmailException;
+import com.backend.shared.exception.UserAlreadyExistException;
+import com.backend.shared.exception.UserNotFoundException;
+import com.backend.security.JwtTokenProvider;
 import com.backend.dto.UserDTO;
 import com.backend.dto.request.MagicLinkRequest;
 import com.backend.dto.request.PasswordResetRequest;
@@ -46,16 +46,15 @@ public class AuthController {
         log.info("Registering user with email: {}", userDTO.getEmail());
         try {
             authService.registerUser(userDTO);
-            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "Your account has been created successfully", HttpStatus.CREATED.toString()
-            );
+            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "Your account has been created successfully", HttpStatus.CREATED.toString(), "/api/auth/register");
             return ResponseEntity.status(201).body(responseDetails);
         } catch (EmptyFieldException | PasswordOrEmailException | UserAlreadyExistException e) {
             log.error("Registration failed: {}", e.getMessage());
-            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), e.getMessage(), HttpStatus.BAD_REQUEST.toString());
+            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), e.getMessage(), HttpStatus.BAD_REQUEST.toString(), "/api/auth/register");
             return ResponseEntity.status(400).body(responseDetails);
         } catch (Exception e) {
             log.error("Unexpected error during registration: {}", e.getMessage(), e);
-            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "Failed to save user", HttpStatus.INTERNAL_SERVER_ERROR.toString());
+            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "Failed to save user", HttpStatus.INTERNAL_SERVER_ERROR.toString(), "/api/auth/register");
             return ResponseEntity.status(500).body(responseDetails);
         }
     }
@@ -66,12 +65,12 @@ public class AuthController {
             log.info("Logging in user: {}", userDTO.getUsername());
             Authentication authentication = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(userDTO.getUsername(), userDTO.getPassword()));
             String token = jwtTokenProvider.generateToken(authentication);
-            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "Login successful", HttpStatus.OK.toString());
+            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "Login successful", HttpStatus.OK.toString(), "/api/auth/register");
             LoginResponse loginResponse = new LoginResponse(token, responseDetails);
             return ResponseEntity.ok(loginResponse);
         } catch (Exception e) {
             log.error("Login failed for user: {}", userDTO.getUsername(), e);
-            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "Invalid credentials", HttpStatus.UNAUTHORIZED.toString());
+            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "Invalid credentials", HttpStatus.UNAUTHORIZED.toString(), "/api/auth/register");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseDetails);
         }
     }
@@ -81,11 +80,11 @@ public class AuthController {
         try {
             log.info("Requesting magic link for email: {}", request.getEmail());
             authService.requestMagicLink(request.getEmail());
-            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "Magic link sent to email", HttpStatus.OK.toString());
+            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "Magic link sent to email", HttpStatus.OK.toString(), "/api/auth/register");
             return ResponseEntity.status(200).body(responseDetails);
         } catch (UserNotFoundException e) {
             log.error("Failed to send magic link: {}", e.getMessage());
-            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "User not found", HttpStatus.BAD_REQUEST.toString());
+            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "User not found", HttpStatus.BAD_REQUEST.toString(), "/api/auth/register");
             return ResponseEntity.status(400).body(responseDetails);
         }
     }
@@ -94,11 +93,11 @@ public class AuthController {
     public ResponseEntity<?> validateMagicLink(@RequestParam String link) {
         try {
             authService.validateMagicLink(link);
-            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "Your account has been verified successfully", HttpStatus.OK.toString());
+            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "Your account has been verified successfully", HttpStatus.OK.toString(), "/api/auth/register");
             return ResponseEntity.status(201).body(responseDetails);
         } catch (Exception e) {
             log.error("Magic link validation failed: {}", e.getMessage());
-            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "Your magic link is expired already", HttpStatus.BAD_REQUEST.toString());
+            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "Your magic link is expired already", HttpStatus.BAD_REQUEST.toString(), "/api/auth/register");
             return ResponseEntity.status(400).body(responseDetails);
         }
     }
@@ -119,15 +118,15 @@ public class AuthController {
         try {
             log.info("Requesting password reset for email: {}", request.getEmail());
             authService.requestPasswordReset(request.getEmail());
-            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "Password reset link sent to email", HttpStatus.OK.toString());
+            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "Password reset link sent to email", HttpStatus.OK.toString(), "/api/auth/register");
             return ResponseEntity.status(200).body(responseDetails);
         } catch (UserNotFoundException e) {
             log.error("Failed to send password reset link: {}", e.getMessage());
-            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "User not found", HttpStatus.BAD_REQUEST.toString());
+            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "User not found", HttpStatus.BAD_REQUEST.toString(), "/api/auth/register");
             return ResponseEntity.status(400).body(responseDetails);
         } catch (Exception e) {
             log.error("Unexpected error during password reset request: {}", e.getMessage());
-            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "Failed to process password reset request", HttpStatus.INTERNAL_SERVER_ERROR.toString());
+            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "Failed to process password reset request", HttpStatus.INTERNAL_SERVER_ERROR.toString(), "/api/auth/register");
             return ResponseEntity.status(500).body(responseDetails);
         }
     }
@@ -137,15 +136,15 @@ public class AuthController {
         try {
             log.info("Resetting password for token");
             authService.resetPassword(request.getLink(), request.getNewPassword());
-            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "Password reset successful", HttpStatus.OK.toString());
+            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "Password reset successful", HttpStatus.OK.toString(), "/api/auth/register");
             return ResponseEntity.status(200).body(responseDetails);
         } catch (PasswordOrEmailException e) {
             log.error("Password reset failed: {}", e.getMessage());
-            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), e.getMessage(), HttpStatus.BAD_REQUEST.toString());
+            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), e.getMessage(), HttpStatus.BAD_REQUEST.toString(), "/api/auth/register");
             return ResponseEntity.status(400).body(responseDetails);
         } catch (Exception e) {
             log.error("Unexpected error during password reset: {}", e.getMessage());
-            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "Invalid or expired reset token", HttpStatus.BAD_REQUEST.toString());
+            ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "Invalid or expired reset token", HttpStatus.BAD_REQUEST.toString(), "/api/auth/register");
             return ResponseEntity.status(400).body(responseDetails);
         }
     }

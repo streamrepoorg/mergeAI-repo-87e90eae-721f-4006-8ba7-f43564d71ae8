@@ -1,6 +1,6 @@
-package com.backend.shared;
+package com.backend.config;
 
-import com.backend.config.exception.GithubNotFoundException;
+import com.backend.shared.exception.GithubNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;

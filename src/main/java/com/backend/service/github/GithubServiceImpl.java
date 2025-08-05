@@ -1,19 +1,15 @@
 package com.backend.service.github;
 
-import com.backend.config.exception.GithubNotFoundException;
-import com.backend.config.exception.GithubProcessingException;
+import com.backend.config.CloudinaryConfig;
+import com.backend.dto.request.GithubStatusResponse;
+import com.backend.shared.exception.GithubNotFoundException;
+import com.backend.shared.exception.GithubProcessingException;
 import com.backend.model.github.GitStatus;
 import com.backend.model.github.Github;
 import com.backend.repository.github.GithubRepository;
-import com.backend.shared.GithubLinkValidator;
+import com.backend.config.GithubLinkValidator;
+import com.cloudinary.Cloudinary;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.github.dockerjava.api.DockerClient;
-import com.github.dockerjava.api.command.CreateContainerCmd;
-import com.github.dockerjava.api.model.Bind;
-import com.github.dockerjava.api.model.HostConfig;
-import com.github.dockerjava.api.model.Volume;
-import com.github.dockerjava.core.DefaultDockerClientConfig;
-import com.github.dockerjava.core.DockerClientBuilder;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.jgit.api.Git;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,22 +18,22 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
-import org.springframework.kafka.annotation.KafkaListener;
-import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.retry.annotation.Backoff;
-import org.springframework.retry.annotation.Retryable;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
@@ -46,46 +42,48 @@ public class GithubServiceImpl implements GithubService {
     private final GithubRepository githubRepository;
     private final RestTemplate restTemplate;
     private final GithubLinkValidator gitLinkValidator;
-    private final KafkaTemplate<String, String> kafkaTemplate;
-    private final ObjectMapper objectMapper = new ObjectMapper();
-    private final DockerClient dockerClient;
-
-    @Value("${clone.directory}")
-    private String cloneBasePath;
-
-    @Value("${kafka.topic:repository-processing}")
-    private String kafkaTopic;
-
-    @Value("${docker.image.javascript:node:16}")
-    private String jsDockerImage;
-
-    @Value("${docker.image.java:openjdk:11}")
-    private String javaDockerImage;
-
-    @Value("${docker.image.python:python:3.9}")
-    private String pythonDockerImage;
-
-    @Value("${docker.host:tcp://localhost:2375}")
-    private String dockerHost;
+    private final ObjectMapper objectMapper;
+    private final Cloudinary cloudinary;
+    private final SimpMessagingTemplate messagingTemplate;
+    private final String cloneBasePath;
 
     public GithubServiceImpl(
             GithubRepository githubRepository,
             RestTemplate restTemplate,
             GithubLinkValidator gitLinkValidator,
-            KafkaTemplate<String, String> kafkaTemplate
+            SimpMessagingTemplate messagingTemplate,
+            CloudinaryConfig cloudinaryConfig,
+            @Value("${github.clone.base-path:/tmp/github-clones}") String cloneBasePath
     ) {
         this.githubRepository = githubRepository;
         this.restTemplate = restTemplate;
         this.gitLinkValidator = gitLinkValidator;
-        this.kafkaTemplate = kafkaTemplate;
+        this.messagingTemplate = messagingTemplate;
+        this.objectMapper = new ObjectMapper();
+        this.cloneBasePath = cloneBasePath;
+
+        if (cloudinaryConfig.getCloudName() == null || cloudinaryConfig.getApiKey() == null || cloudinaryConfig.getApiSecret() == null) {
+            throw new IllegalStateException("Missing Cloudinary configuration properties");
+        }
+
+        this.cloudinary = new Cloudinary(Map.of(
+                "cloud_name", cloudinaryConfig.getCloudName(),
+                "api_key", cloudinaryConfig.getApiKey(),
+                "api_secret", cloudinaryConfig.getApiSecret()
+        ));
+        createCloneBasePath();
+    }
+
+    private void createCloneBasePath() {
+        Path basePath = Paths.get(cloneBasePath);
         try {
-            DefaultDockerClientConfig config = DefaultDockerClientConfig.createDefaultConfigBuilder()
-                    .withDockerHost(dockerHost)
-                    .build();
-            this.dockerClient = DockerClientBuilder.getInstance(config).build();
-        } catch (Exception e) {
-            log.error("Failed to initialize Docker client: {}", e.getMessage(), e);
-            throw new RuntimeException("Docker client initialization failed", e);
+            if (!Files.exists(basePath)) {
+                Files.createDirectories(basePath);
+                log.info("Created clone base directory: {}", cloneBasePath);
+            }
+        } catch (IOException e) {
+            log.error("Failed to create clone base directory {}: {}", cloneBasePath, e.getMessage(), e);
+            throw new IllegalStateException("Cannot create clone base directory: " + e.getMessage());
         }
     }
 
@@ -104,43 +102,79 @@ public class GithubServiceImpl implements GithubService {
             github.setCreatedAt(LocalDateTime.now().toInstant(ZoneOffset.UTC));
             github.setUpdatedAt(LocalDateTime.now().toInstant(ZoneOffset.UTC));
             githubRepository.save(github);
-            kafkaTemplate.send(kafkaTopic, repositoryId);
-            log.info("Sent repository {} to Kafka for processing", repositoryId);
+            processRepositoryAsync(repositoryId);
+            log.info("Initiated processing for repository ID: {}", repositoryId);
             return repositoryId;
         } catch (Exception e) {
-            log.error("Failed to process repository: {}", e.getMessage(), e);
-            throw new GithubProcessingException("Failed to process repository: " + e.getMessage());
+            log.error("Failed to initiate repository processing: {}", e.getMessage(), e);
+            throw new GithubProcessingException("Failed to initiate repository processing: " + e.getMessage());
         }
     }
 
-    @KafkaListener(topics = "${kafka.topic}", groupId = "repo-processor")
-    private void processRepositoryAsync(String repositoryId) {
+    @Override
+    public GithubStatusResponse getRepositoryStatus(String repositoryId) {
+        try {
+            Github repository = githubRepository.findById(repositoryId)
+                    .orElseThrow(() -> new GithubNotFoundException("Repository not found with ID: " + repositoryId));
+            return new GithubStatusResponse(
+                    repositoryId,
+                    "Repository status retrieved successfully",
+                    "SUCCESS",
+                    repository.getCloneGitStatus().toString(),
+                    repository.getRunGitStatus().toString(),
+                    repository.getPrimaryLanguage() != null ? repository.getPrimaryLanguage() : "Unknown",
+                    repository.getResultUrl(),
+                    repository.getGithubLink(),
+                    LocalDateTime.now()
+            );
+        } catch (GithubNotFoundException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Failed to fetch status for repository {}: {}", repositoryId, e.getMessage(), e);
+            throw new GithubProcessingException("Failed to fetch repository status: " + e.getMessage());
+        }
+    }
+
+    @Async
+    public void processRepositoryAsync(String repositoryId) {
         Github repository = githubRepository.findById(repositoryId)
-                .orElseThrow(() -> new GithubNotFoundException("Repository not found with id: " + repositoryId));
+                .orElseThrow(() -> new GithubNotFoundException("Repository not found with ID: " + repositoryId));
         String clonePath = null;
         try {
+            sendWebSocketUpdate(repositoryId, "Starting repository processing...", "INFO");
             if (!gitLinkValidator.isValidGitHubLink(repository.getGithubLink())) {
-                updateRepositoryStatus(repository);
+                updateRepositoryStatus(repository, GitStatus.FAILED, GitStatus.FAILED);
                 throw new GithubProcessingException("Invalid GitHub link: " + repository.getGithubLink());
             }
-            clonePath = cloneBasePath + "/" + repositoryId;
+            clonePath = cloneBasePath + File.separator + repositoryId;
             File cloneDir = new File(clonePath);
             if (!cloneDir.mkdirs()) {
                 throw new IOException("Failed to create clone directory: " + clonePath);
             }
-            cloneRepositoryWithRetry(repository, clonePath, cloneDir);
+
+            sendWebSocketUpdate(repositoryId, "Cloning repository...", "INFO");
+            cloneRepository(repository, clonePath, cloneDir);
             repository.setCloneGitStatus(GitStatus.SUCCESS);
-            String languages = detectLanguagesWithRetry(repository.getGithubLink());
-            repository.setPrimaryLanguage(languages);
-            String primaryLanguage = getPrimaryLanguage(languages);
-            repository.setPrimaryLanguage(primaryLanguage);
-            String runStatus = runProjectInDocker(cloneDir, primaryLanguage);
-            repository.setRunGitStatus(GitStatus.valueOf(runStatus));
+
+            sendWebSocketUpdate(repositoryId, "Detecting project languages...", "INFO");
+            String languages = detectLanguages(repository.getGithubLink());
+            repository.setPrimaryLanguage(getPrimaryLanguage(languages));
+
+            sendWebSocketUpdate(repositoryId, "Processing project...", "INFO");
+            String resultFilePath = processProject(cloneDir, repository.getPrimaryLanguage(), repositoryId);
+
+            sendWebSocketUpdate(repositoryId, "Uploading results to Cloudinary...", "INFO");
+            String cloudinaryUrl = uploadToCloudinary(resultFilePath, repositoryId);
+            repository.setResultUrl(cloudinaryUrl);
+            repository.setRunGitStatus(GitStatus.SUCCESS);
             repository.setUpdatedAt(LocalDateTime.now().toInstant(ZoneOffset.UTC));
+
             githubRepository.save(repository);
+            sendWebSocketUpdate(repositoryId, "Processing complete! Results available at: " + cloudinaryUrl, "SUCCESS");
             log.info("Successfully processed repository: {}", repository.getGithubLink());
         } catch (Exception e) {
-            updateRepositoryStatus(repository);
+            updateRepositoryStatus(repository, GitStatus.FAILED, GitStatus.FAILED);
+            sendWebSocketUpdate(repositoryId, "Error: " + e.getMessage(), "ERROR");
             log.error("Failed to process repository {}: {}", repository.getGithubLink(), e.getMessage(), e);
             throw new GithubProcessingException("Failed to process repository: " + e.getMessage());
         } finally {
@@ -150,21 +184,20 @@ public class GithubServiceImpl implements GithubService {
         }
     }
 
-    @Retryable(maxAttempts = 3, backoff = @Backoff(delay = 1000, multiplier = 2))
-    private void cloneRepositoryWithRetry(Github repository, String clonePath, File cloneDir) {
+    private void cloneRepository(Github repository, String clonePath, File cloneDir) {
         try {
             Git.cloneRepository()
                     .setURI(repository.getGithubLink())
                     .setDirectory(cloneDir)
                     .call();
+            log.info("Successfully cloned repository {} to {}", repository.getGithubLink(), clonePath);
         } catch (Exception e) {
-            log.error("Clone attempt failed for {}: {}", repository.getGithubLink(), e.getMessage(), e);
-            throw new GithubProcessingException("Clone failed: " + e.getMessage());
+            log.error("Failed to clone repository {}: {}", repository.getGithubLink(), e.getMessage(), e);
+            throw new GithubProcessingException("Failed to clone repository: " + e.getMessage());
         }
     }
 
-    @Retryable(maxAttempts = 3, backoff = @Backoff(delay = 1000, multiplier = 2))
-    private String detectLanguagesWithRetry(String githubLink) {
+    private String detectLanguages(String githubLink) {
         try {
             String[] parts = githubLink.split("/");
             if (parts.length < 2) {
@@ -177,147 +210,153 @@ public class GithubServiceImpl implements GithubService {
             headers.set("Accept", "application/vnd.github.v3+json");
             HttpEntity<?> entity = new HttpEntity<>(headers);
             ResponseEntity<Map<String, Long>> response = restTemplate.exchange(
-                    apiUrl, HttpMethod.GET, entity, new ParameterizedTypeReference<>() {});
+                    apiUrl,
+                    HttpMethod.GET,
+                    entity,
+                    new ParameterizedTypeReference<>() {}
+            );
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                return objectMapper.writeValueAsString(response.getBody());
+                String languages = objectMapper.writeValueAsString(response.getBody());
+                log.info("Detected languages for {}: {}", githubLink, languages);
+                return languages;
             }
+            log.warn("No languages detected for {}", githubLink);
             return "{}";
         } catch (Exception e) {
             log.error("Failed to detect languages for {}: {}", githubLink, e.getMessage(), e);
-            throw new GithubProcessingException("Language detection failed: " + e.getMessage());
+            throw new GithubProcessingException("Failed to detect languages: " + e.getMessage());
         }
     }
 
-    @Override
-    public String getRepositoryStatus(String repositoryId) {
+    private String getPrimaryLanguage(String languageJson) {
         try {
-            Github repository = githubRepository.findById(repositoryId)
-                    .orElseThrow(() -> new GithubNotFoundException("Repository not found with ID: " + repositoryId));
-            return String.format(
-                    "Clone Status: %s | Run Status: %s | Primary Language: %s",
-                    repository.getCloneGitStatus(),
-                    repository.getRunGitStatus(),
-                    repository.getPrimaryLanguage() != null ? repository.getPrimaryLanguage() : "Unknown"
-            );
-        } catch (GithubNotFoundException e) {
-            log.error("Repository not found: {}", e.getMessage(), e);
-            throw e;
-        } catch (Exception e) {
-            log.error("Unexpected error fetching status for {}: {}", repositoryId, e.getMessage(), e);
-            throw new GithubProcessingException("Failed to fetch repository status");
-        }
-    }
-
-    private String getPrimaryLanguage(String language) {
-        try {
-            Map<String, Long> languages = objectMapper.readValue(language, Map.class);
-            return languages.keySet().stream()
+            Map<String, Long> languages = objectMapper.readValue(languageJson, Map.class);
+            String primaryLanguage = languages.keySet().stream()
                     .max((lang1, lang2) -> Long.compare(languages.get(lang1), languages.get(lang2)))
                     .orElse("Unknown");
+            log.info("Primary language detected: {}", primaryLanguage);
+            return primaryLanguage;
         } catch (Exception e) {
             log.error("Failed to parse primary language: {}", e.getMessage(), e);
             return "Unknown";
         }
     }
 
-    private String runProjectInDocker(File repoDir, String primaryLanguage) {
-        String containerId = null;
-        try {
-            String imageName = getDockerImage(primaryLanguage);
-            String[] command = getRunCommand(repoDir, primaryLanguage);
-            if (command == null) {
-                return "UNSUPPORTED";
-            }
-            CreateContainerCmd containerCmd = dockerClient.createContainerCmd(imageName)
-                    .withHostConfig(new HostConfig().withBinds(new Bind(repoDir.getAbsolutePath(), new Volume("/app"))))
-                    .withWorkingDir("/app")
-                    .withCmd(command);
-            containerId = containerCmd.exec().getId();
-            dockerClient.startContainerCmd(containerId).exec();
-            dockerClient.waitContainerCmd(containerId)
-                    .exec(new com.github.dockerjava.core.command.WaitContainerResultCallback())
-                    .awaitStatusCode(30, TimeUnit.SECONDS);
-            return "SUCCESS";
-        } catch (Exception e) {
-            log.error("Failed to run project in {}: {}", repoDir.getAbsolutePath(), e.getMessage(), e);
-            return "FAILED";
-        } finally {
-            if (containerId != null) {
-                try {
-                    dockerClient.removeContainerCmd(containerId).withForce(true).exec();
-                } catch (Exception e) {
-                    log.warn("Failed to cleanup container {}: {}", containerId, e.getMessage());
-                }
-            }
+    private String processProject(File repoDir, String primaryLanguage, String repositoryId) throws IOException {
+        String resultFilePath = cloneBasePath + File.separator + repositoryId + File.separator + "results.txt";
+        File resultFile = new File(resultFilePath);
+        if (!resultFile.getParentFile().mkdirs() && !resultFile.getParentFile().exists()) {
+            throw new IOException("Failed to create results directory for: " + resultFilePath);
         }
-    }
 
-    private String[] getRunCommand(File repoDir, String primaryLanguage) throws IOException {
-        switch (primaryLanguage.toLowerCase()) {
-            case "javascript":
-            case "typescript":
-                String packageJsonPath = repoDir.getAbsolutePath() + "/package.json";
-                if (Files.exists(Paths.get(packageJsonPath))) {
-                    Map<String, Object> packageJson = objectMapper.readValue(new File(packageJsonPath), Map.class);
-                    Map<String, String> scripts = (Map<String, String>) packageJson.get("scripts");
-                    if (scripts != null && scripts.containsKey("start")) {
-                        return new String[]{"npm", "install", "&&", "npm", "run", "start"};
+        try (FileWriter writer = new FileWriter(resultFile)) {
+            String projectType = detectProjectType(repoDir);
+            writer.write("Repository ID: " + repositoryId + "\n");
+            writer.write("Primary Language: " + primaryLanguage + "\n");
+            writer.write("Project Type: " + projectType + "\n");
+            writer.write("Processing Log:\n");
+
+            switch (projectType.toLowerCase()) {
+                case "web":
+                    writer.write("Detected web project. Generating preview...\n");
+                    writer.write("Preview generated (placeholder).\n");
+                    break;
+                case "api":
+                    writer.write("Detected API project. Analyzing endpoints...\n");
+                    Map<String, String> endpoints = detectEndpoints(repoDir);
+                    for (Map.Entry<String, String> entry : endpoints.entrySet()) {
+                        writer.write("Endpoint: " + entry.getKey() + ", Status: " + entry.getValue() + "\n");
                     }
-                }
-                return null;
-            case "java":
-                String pomPath = repoDir.getAbsolutePath() + "/pom.xml";
-                if (Files.exists(Paths.get(pomPath))) {
-                    return new String[]{"mvn", "clean", "install", "-DskipTests", "&&", "mvn", "spring-boot:run"};
-                }
-                return null;
-            case "python":
-                String requirementsPath = repoDir.getAbsolutePath() + "/requirements.txt";
-                String[] baseCmd = Files.exists(Paths.get(requirementsPath))
-                        ? new String[]{"pip", "install", "-r", "requirements.txt", "&&"}
-                        : new String[]{};
-                String mainPyPath = repoDir.getAbsolutePath() + "/main.py";
-                String appPyPath = repoDir.getAbsolutePath() + "/app.py";
-                if (Files.exists(Paths.get(mainPyPath))) {
-                    return concatArrays(baseCmd, new String[]{"python", "main.py"});
-                } else if (Files.exists(Paths.get(appPyPath))) {
-                    return concatArrays(baseCmd, new String[]{"python", "app.py"});
-                }
-                return null;
-            default:
-                return null;
+                    break;
+                case "mobile":
+                    writer.write("Detected mobile project. Generating preview...\n");
+                    writer.write("Mobile preview generated (placeholder).\n");
+                    break;
+                default:
+                    writer.write("Unknown project type. No specific actions taken.\n");
+            }
+            log.info("Generated results file for repository {} at {}", repositoryId, resultFilePath);
+            return resultFilePath;
+        } catch (IOException e) {
+            log.error("Failed to process project for repository {}: {}", repositoryId, e.getMessage(), e);
+            throw e;
         }
     }
 
-    private String[] concatArrays(String[] arr1, String[] arr2) {
-        String[] result = new String[arr1.length + arr2.length];
-        System.arraycopy(arr1, 0, result, 0, arr1.length);
-        System.arraycopy(arr2, 0, result, arr1.length, arr2.length);
-        return result;
+    private String detectProjectType(File repoDir) {
+        Path repoPath = repoDir.toPath();
+        if (Files.exists(repoPath.resolve("package.json"))) {
+            return "web";
+        } else if (Files.exists(repoPath.resolve("pom.xml")) || Files.exists(repoPath.resolve("openapi.yaml"))) {
+            return "api";
+        } else if (Files.exists(repoPath.resolve("AndroidManifest.xml")) || Files.exists(repoPath.resolve("Info.plist"))) {
+            return "mobile";
+        }
+        return "unknown";
     }
 
-    private String getDockerImage(String primaryLanguage) {
-        return switch (primaryLanguage.toLowerCase()) {
-            case "javascript", "typescript" -> jsDockerImage;
-            case "java" -> javaDockerImage;
-            case "python" -> pythonDockerImage;
-            default -> "ubuntu:latest";
-        };
+    private Map<String, String> detectEndpoints(File repoDir) {
+        Map<String, String> endpoints = new HashMap<>();
+        endpoints.put("/api/sample", "Not Tested");
+        return endpoints;
     }
 
-    private void updateRepositoryStatus(Github repository) {
-        repository.setCloneGitStatus(GitStatus.FAILED);
-        repository.setRunGitStatus(GitStatus.FAILED);
+    private String uploadToCloudinary(String filePath, String repositoryId) {
+        try {
+            File file = new File(filePath);
+            if (!file.exists()) {
+                throw new IOException("Result file does not exist: " + filePath);
+            }
+            Map uploadResult = cloudinary.uploader().upload(file, Map.of(
+                    "public_id", "repo_results/" + repositoryId,
+                    "resource_type", "raw"
+            ));
+            String url = (String) uploadResult.get("secure_url");
+            log.info("Uploaded results for repository {} to Cloudinary: {}", repositoryId, url);
+            return url;
+        } catch (Exception e) {
+            log.error("Failed to upload to Cloudinary for repository {}: {}", repositoryId, e.getMessage(), e);
+            throw new GithubProcessingException("Failed to upload results to Cloudinary: " + e.getMessage());
+        }
+    }
+
+    private void sendWebSocketUpdate(String repositoryId, String message, String status) {
+        try {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("repositoryId", repositoryId);
+            payload.put("message", message);
+            payload.put("status", status);
+            payload.put("timestamp", LocalDateTime.now().toInstant(ZoneOffset.UTC).toString());
+            String destination = "/topic/repo/" + repositoryId;
+            messagingTemplate.convertAndSend(destination, objectMapper.writeValueAsString(payload));
+            log.info("WebSocket [{}] [{}]: {}", repositoryId, status, message);
+        } catch (Exception e) {
+            log.error("Failed to send WebSocket update for repository {}: {}", repositoryId, e.getMessage(), e);
+        }
+    }
+
+    private void updateRepositoryStatus(Github repository, GitStatus cloneStatus, GitStatus runStatus) {
+        repository.setCloneGitStatus(cloneStatus);
+        repository.setRunGitStatus(runStatus);
         repository.setUpdatedAt(LocalDateTime.now().toInstant(ZoneOffset.UTC));
         githubRepository.save(repository);
+        log.info("Updated repository status for {}: clone={}, run={}", repository.getId(), cloneStatus, runStatus);
     }
 
     private void cleanupCloneDirectory(String clonePath) {
         try {
-            Files.walk(Paths.get(clonePath))
-                    .sorted((p1, p2) -> -p1.compareTo(p2))
-                    .map(java.nio.file.Path::toFile)
-                    .forEach(File::delete);
+            Path path = Paths.get(clonePath);
+            if (Files.exists(path)) {
+                Files.walk(path)
+                        .sorted((p1, p2) -> -p1.compareTo(p2))
+                        .map(Path::toFile)
+                        .forEach(file -> {
+                            if (!file.delete()) {
+                                log.warn("Failed to delete file: {}", file.getAbsolutePath());
+                            }
+                        });
+                log.info("Cleaned up clone directory: {}", clonePath);
+            }
         } catch (IOException e) {
             log.warn("Failed to cleanup clone directory {}: {}", clonePath, e.getMessage());
         }

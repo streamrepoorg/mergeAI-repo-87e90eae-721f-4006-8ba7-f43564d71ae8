@@ -18,6 +18,7 @@ public class Github {
         private String id;
         private User user;
         private String githubLink;
+        private String resultUrl;
         private GitStatus cloneGitStatus;
 
         @Field("languages")

@@ -1,6 +1,6 @@
 package com.backend.controller.auth;
 
-import com.backend.config.security.JwtTokenProvider;
+import com.backend.security.JwtTokenProvider;
 import com.backend.dto.UserDTO;
 import com.backend.dto.request.MagicLinkRequest;
 import com.backend.dto.request.PasswordResetRequest;

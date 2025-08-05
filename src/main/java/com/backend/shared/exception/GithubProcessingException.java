@@ -1,4 +1,4 @@
-package com.backend.config.exception;
+package com.backend.shared.exception;
 
 public class GithubProcessingException extends RuntimeException {
     public GithubProcessingException(String message) {

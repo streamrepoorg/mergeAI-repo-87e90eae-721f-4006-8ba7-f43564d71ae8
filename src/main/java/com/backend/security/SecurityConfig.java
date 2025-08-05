@@ -1,4 +1,4 @@
-package com.backend.config.security;
+package com.backend.security;
 
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;

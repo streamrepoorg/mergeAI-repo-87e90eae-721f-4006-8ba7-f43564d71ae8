@@ -1,10 +1,10 @@
 package com.backend.service.user;
 
-import com.backend.config.exception.UserNotFoundException;
+import com.backend.shared.exception.UserNotFoundException;
 import com.backend.dto.UserDTO;
 import com.backend.model.user.User;
 import com.backend.repository.user.UserRepository;
-import com.backend.shared.PasswordUtil;
+import com.backend.config.PasswordUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;

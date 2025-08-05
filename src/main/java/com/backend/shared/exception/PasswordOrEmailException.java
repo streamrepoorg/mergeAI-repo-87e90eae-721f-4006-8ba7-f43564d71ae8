@@ -1,4 +1,4 @@
-package com.backend.config.exception;
+package com.backend.shared.exception;
 
 public class PasswordOrEmailException extends RuntimeException {
     public PasswordOrEmailException(String message, Throwable invalidPasswordLength) {
