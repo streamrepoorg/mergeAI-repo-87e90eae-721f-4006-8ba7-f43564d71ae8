@@ -1,6 +1,5 @@
 package com.backend.service.auth;
 
-import com.backend.config.exception.*;
 import com.backend.dto.UserDTO;
 import com.backend.model.email.MagicLink;
 import com.backend.model.email.PasswordResetLink;
@@ -9,7 +8,8 @@ import com.backend.repository.mail.MagicLinkRepository;
 import com.backend.repository.mail.PasswordResetRepository;
 import com.backend.repository.user.UserRepository;
 import com.backend.service.email.EmailServiceImpl;
-import com.backend.shared.PasswordUtil;
+import com.backend.config.PasswordUtil;
+import com.backend.shared.exception.*;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;

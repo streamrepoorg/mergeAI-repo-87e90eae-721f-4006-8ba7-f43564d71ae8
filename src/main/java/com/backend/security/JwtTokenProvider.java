@@ -1,4 +1,4 @@
-package com.backend.config.security;
+package com.backend.security;
 
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;

@@ -1,4 +1,4 @@
-package com.backend.config.security;
+package com.backend.security;
 
 import com.backend.model.user.User;
 import com.backend.repository.user.UserRepository;

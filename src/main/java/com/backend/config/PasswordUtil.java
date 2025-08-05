@@ -1,4 +1,4 @@
-package com.backend.shared;
+package com.backend.config;
 
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 

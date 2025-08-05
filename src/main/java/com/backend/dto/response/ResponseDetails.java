@@ -9,10 +9,12 @@ public class ResponseDetails {
     private LocalDateTime timestamp;
     private String message;
     private String status;
+    private String path;
 
-    public ResponseDetails(LocalDateTime timestamp, String message, String status) {
+    public ResponseDetails(LocalDateTime timestamp, String message, String status, String path) {
         this.timestamp = timestamp;
         this.message = message;
         this.status = status;
+        this.path = path;
     }
 }

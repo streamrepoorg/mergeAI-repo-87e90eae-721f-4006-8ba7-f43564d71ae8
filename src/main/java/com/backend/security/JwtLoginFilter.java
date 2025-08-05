@@ -1,4 +1,4 @@
-package com.backend.config.security;
+package com.backend.security;
 
 import com.backend.dto.UserDTO;
 import com.fasterxml.jackson.databind.ObjectMapper;

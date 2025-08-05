@@ -1,4 +1,4 @@
-package com.backend.config.exception;
+package com.backend.shared.exception;
 
 public class UserAlreadyExistException extends RuntimeException{
     public UserAlreadyExistException(String message) {
