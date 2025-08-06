@@ -7,6 +7,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.LocalDateTime;
 
@@ -19,6 +21,15 @@ public class GlobalExceptionHandler {
         log.error("Not found error: {}", ex.getMessage(), ex);
         ResponseDetails error = new ResponseDetails(LocalDateTime.now(), ex.getMessage(), HttpStatus.NOT_FOUND.toString(), null);
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<?> handleNoResourceFound(NoResourceFoundException ex, WebRequest request) {
+        if (ex.getMessage().contains("favicon.ico")) {
+            return ResponseEntity.notFound().build();
+        }
+        ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "Resource not found: " + ex.getMessage(), HttpStatus.NOT_FOUND.toString(), request.getDescription(false));
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(responseDetails);
     }
 
     @ExceptionHandler(GithubProcessingException.class)
