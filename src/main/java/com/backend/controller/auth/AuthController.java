@@ -1,8 +1,8 @@
 package com.backend.controller.auth;
 
-import com.backend.shared.exception.EmptyFieldException;
+import com.backend.shared.exception.InvalidInputException;
 import com.backend.shared.exception.PasswordOrEmailException;
-import com.backend.shared.exception.UserAlreadyExistException;
+import com.backend.shared.exception.AlreadyExistException;
 import com.backend.shared.exception.UserNotFoundException;
 import com.backend.security.JwtTokenProvider;
 import com.backend.dto.UserDTO;
@@ -48,7 +48,7 @@ public class AuthController {
             authService.registerUser(userDTO);
             ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), "Your account has been created successfully", HttpStatus.CREATED.toString(), "/api/auth/register");
             return ResponseEntity.status(201).body(responseDetails);
-        } catch (EmptyFieldException | PasswordOrEmailException | UserAlreadyExistException e) {
+        } catch (InvalidInputException | PasswordOrEmailException | AlreadyExistException e) {
             log.error("Registration failed: {}", e.getMessage());
             ResponseDetails responseDetails = new ResponseDetails(LocalDateTime.now(), e.getMessage(), HttpStatus.BAD_REQUEST.toString(), "/api/auth/register");
             return ResponseEntity.status(400).body(responseDetails);

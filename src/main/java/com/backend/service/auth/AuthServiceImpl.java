@@ -88,13 +88,13 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public void registerUser(UserDTO userDTO) {
         if (userDTO.getUsername() == null || userDTO.getUsername().isEmpty()) {
-            throw new EmptyFieldException("Username cannot be empty");
+            throw new InvalidInputException("Username cannot be empty");
         }
         if (userDTO.getEmail() == null || userDTO.getEmail().isEmpty()) {
-            throw new EmptyFieldException("Email cannot be empty");
+            throw new InvalidInputException("Email cannot be empty");
         }
         if (userDTO.getPassword() == null || userDTO.getPassword().isEmpty()) {
-            throw new EmptyFieldException("Password cannot be empty");
+            throw new InvalidInputException("Password cannot be empty");
         }
         if (isValidEmail(userDTO.getEmail())) {
             throw new UserNotFoundException("User email is invalid.");
@@ -106,12 +106,12 @@ public class AuthServiceImpl implements AuthService {
             throw new PasswordOrEmailException("Password is too weak.", new Throwable("Invalid password strength"));
         }
         if (existsByUsername(userDTO.getUsername())) {
-            throw new UserAlreadyExistException("Username already exists");
+            throw new AlreadyExistException("Username already exists");
         }
         if (existByEmail(userDTO.getEmail())) {
             User existingUser = userRepository.findByEmail(userDTO.getEmail()).orElseThrow(() -> new RuntimeException("User with email exists but could not be retrieved"));
             if (existingUser.getIsVerified() == true) {
-                throw new UserAlreadyExistException("User is already verified. Please log in");
+                throw new AlreadyExistException("User is already verified. Please log in");
             } else {
                 try {
                     requestMagicLink(existingUser.getEmail());
