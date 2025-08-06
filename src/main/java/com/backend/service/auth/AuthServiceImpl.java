@@ -9,6 +9,7 @@ import com.backend.repository.mail.PasswordResetRepository;
 import com.backend.repository.user.UserRepository;
 import com.backend.service.email.EmailServiceImpl;
 import com.backend.config.PasswordUtil;
+import com.backend.security.JwtTokenProvider; // Add this import
 import com.backend.shared.exception.*;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
@@ -50,6 +51,9 @@ public class AuthServiceImpl implements AuthService {
     @Autowired
     private EmailServiceImpl emailService;
 
+    @Autowired
+    private JwtTokenProvider jwtTokenProvider; // Add this dependency
+
     private final ModelMapper modelMapper = new ModelMapper();
 
     @Value("${frontend.url}")
@@ -83,6 +87,10 @@ public class AuthServiceImpl implements AuthService {
 
     public boolean existByEmail(String email) {
         return userRepository.findByEmail(email).isPresent();
+    }
+
+    public String getFrontendUrl() {
+        return frontendUrl;
     }
 
     @Override
@@ -180,7 +188,8 @@ public class AuthServiceImpl implements AuthService {
     public UserDTO handleOAuth2Redirect(OAuth2AuthenticationToken authentication) {
         log.info("Processing OAuth2 redirect for provider: {}", authentication.getAuthorizedClientRegistrationId());
         String provider = authentication.getAuthorizedClientRegistrationId();
-        String providerId = authentication.getPrincipal().getAttribute("id");
+        Object providerIdObj = authentication.getPrincipal().getAttribute("id");
+        String providerId = providerIdObj != null ? providerIdObj.toString() : null;
         String email = authentication.getPrincipal().getAttribute("email");
         String name = authentication.getPrincipal().getAttribute("name");
         String picture = authentication.getPrincipal().getAttribute("avatar_url");
@@ -191,6 +200,21 @@ public class AuthServiceImpl implements AuthService {
         }
 
         return handleOAuth2User(provider, providerId, email, name, picture);
+    }
+
+    @Override
+    public String handleOAuth2GithubRedirect(OAuth2AuthenticationToken authentication) {
+        log.info("Handling OAuth2 GitHub redirect for provider: {}", authentication.getAuthorizedClientRegistrationId());
+        try {
+            UserDTO userDTO = handleOAuth2Redirect(authentication);
+            String token = jwtTokenProvider.generateToken(authentication);
+            String redirectUrl = String.format("%s/auth/success?token=%s", frontendUrl, token);
+            log.info("Generated redirect URL: {}", redirectUrl);
+            return redirectUrl;
+        } catch (Exception e) {
+            log.error("OAuth2 GitHub redirect failed: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to process OAuth2 GitHub redirect: " + e.getMessage(), e);
+        }
     }
 
     private String fetchGitHubEmail(String accessToken) {
