@@ -43,8 +43,8 @@ public class SecurityConfig {
     }
 
     @Bean
-    public OAuth2AuthorizedClientService authorizedClientService(OAuth2AuthorizedClientRepository authorizedClientRepository) {
-        return new InMemoryOAuth2AuthorizedClientService((ClientRegistrationRepository) authorizedClientRepository);
+    public OAuth2AuthorizedClientService authorizedClientService(ClientRegistrationRepository clientRegistrationRepository) {
+        return new InMemoryOAuth2AuthorizedClientService(clientRegistrationRepository);
     }
 
     @Bean
