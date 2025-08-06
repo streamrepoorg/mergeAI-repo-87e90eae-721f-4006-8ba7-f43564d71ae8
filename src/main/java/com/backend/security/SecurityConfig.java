@@ -56,7 +56,7 @@ public class SecurityConfig {
                                 "/waiting-list/user",
                                 "/login/oauth2/**"
                         ).permitAll()
-                        .requestMatchers("/api/auth/**").hasAnyRole("USER", "ADMIN")
+                        .requestMatchers("/api/auth/**", "/waiting-list/user").hasAnyRole("USER", "ADMIN")
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2 -> oauth2
@@ -90,7 +90,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:3000", "https://stream-repo-frontend.vercel.app"));
+        configuration.setAllowedOrigins(Arrays.asList("http://localhost:3000", "https://stream-repo-frontend.vercel.app", "https://stream-repo-l30u.onrender.com/"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
