@@ -45,7 +45,7 @@ public class SecurityConfig {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/api/auth/register",
@@ -53,6 +53,7 @@ public class SecurityConfig {
                                 "/api/auth/magic-link",
                                 "/api/auth/validate-magic-link",
                                 "/oauth2/**",
+                                "/api/auth/oauth2/github",
                                 "/waiting-list/user",
                                 "/login/oauth2/**"
                         ).permitAll()
