@@ -61,7 +61,9 @@ public class SecurityConfig {
                 )
                 .oauth2Login(oauth2 -> oauth2
                         .redirectionEndpoint(redirection -> redirection
-                                .baseUri("/login/oauth2/code/*"))).headers(headers -> headers
+                                .baseUri("/login/oauth2/code/*"))
+                        .defaultSuccessUrl("/api/auth/oauth2/github", true)
+                ).headers(headers -> headers
                         .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'; script-src 'self' 'unsafe-inline'; object-src 'none'; frame-ancestors 'none';"))
                         .httpStrictTransportSecurity(hsts -> hsts
                                 .includeSubDomains(true)
