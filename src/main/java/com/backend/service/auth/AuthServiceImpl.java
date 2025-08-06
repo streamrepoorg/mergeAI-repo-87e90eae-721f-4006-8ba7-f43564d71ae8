@@ -20,8 +20,11 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import java.security.SecureRandom;
@@ -52,7 +55,7 @@ public class AuthServiceImpl implements AuthService {
     private EmailServiceImpl emailService;
 
     @Autowired
-    private JwtTokenProvider jwtTokenProvider; // Add this dependency
+    private JwtTokenProvider jwtTokenProvider;
 
     private final ModelMapper modelMapper = new ModelMapper();
 
@@ -64,6 +67,9 @@ public class AuthServiceImpl implements AuthService {
 
     @Value("${jwt.magic-link-expiration}")
     private Long magicLinkExpiration;
+
+    @Autowired
+    private OAuth2AuthorizedClientService authorizedClientService;
 
     private boolean isValidEmail(String email) {
         return !email.contains("@") || !email.contains(".");
@@ -87,10 +93,6 @@ public class AuthServiceImpl implements AuthService {
 
     public boolean existByEmail(String email) {
         return userRepository.findByEmail(email).isPresent();
-    }
-
-    public String getFrontendUrl() {
-        return frontendUrl;
     }
 
     @Override
@@ -195,8 +197,7 @@ public class AuthServiceImpl implements AuthService {
         String picture = authentication.getPrincipal().getAttribute("avatar_url");
 
         if (email == null) {
-            String accessToken = authentication.getPrincipal().getAttribute("access_token");
-            email = fetchGitHubEmail(accessToken);
+            email = fetchGitHubEmail(authentication);
         }
 
         return handleOAuth2User(provider, providerId, email, name, picture);
@@ -217,21 +218,38 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 
-    private String fetchGitHubEmail(String accessToken) {
+    private String fetchGitHubEmail(OAuth2AuthenticationToken authentication) {
         String url = "https://api.github.com/user/emails";
+        OAuth2AuthorizedClient client = authorizedClientService.loadAuthorizedClient(authentication.getAuthorizedClientRegistrationId(), authentication.getName());
+        if (client == null || client.getAccessToken() == null) {
+            log.error("No authorized client or access token found for user: {}", authentication.getName());
+            throw new IllegalArgumentException("No valid access token available");
+        }
+        String accessToken = client.getAccessToken().getTokenValue();
+        log.info("Fetching GitHub email with access token: {}", accessToken.substring(0, 10) + "...");
+
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(accessToken);
         HttpEntity<?> entity = new HttpEntity<>(headers);
-        ResponseEntity<List<Map<String, Object>>> response = restTemplate.exchange(url, HttpMethod.GET, entity, new ParameterizedTypeReference<>() {});
-        List<Map<String, Object>> emails = response.getBody();
-        if (emails != null) {
-            for (Map<String, Object> emailData : emails) {
-                if (Boolean.TRUE.equals(emailData.get("primary")) && Boolean.TRUE.equals(emailData.get("verified"))) {
-                    return (String) emailData.get("email");
+        try {
+            ResponseEntity<List<Map<String, Object>>> response = restTemplate.exchange(
+                    url, HttpMethod.GET, entity, new ParameterizedTypeReference<>() {});
+            List<Map<String, Object>> emails = response.getBody();
+            if (emails != null) {
+                for (Map<String, Object> emailData : emails) {
+                    if (Boolean.TRUE.equals(emailData.get("primary")) && Boolean.TRUE.equals(emailData.get("verified"))) {
+                        String email = (String) emailData.get("email");
+                        log.info("Found verified primary email: {}", email);
+                        return email;
+                    }
                 }
             }
+            log.warn("No verified primary email found for GitHub user");
+            return generateUniqueUsername("github_user") + "@example.com"; // Fallback
+        } catch (HttpClientErrorException e) {
+            log.error("Failed to fetch GitHub email: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
+            throw new IllegalArgumentException("Failed to fetch GitHub email: " + e.getMessage(), e);
         }
-        throw new IllegalArgumentException("No verified email found for GitHub user");
     }
 
     private String generateUniqueUsername(String email) {
