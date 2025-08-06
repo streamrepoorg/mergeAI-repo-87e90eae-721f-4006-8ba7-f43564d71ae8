@@ -149,24 +149,31 @@ public class AuthServiceImpl implements AuthService {
         }
 
         Optional<User> existingUser = userRepository.findByProviderAndProviderId(provider, providerId);
+        User user;
         if (existingUser.isPresent()) {
-            User user = existingUser.get();
+            user = existingUser.get();
             user.setName(name != null ? name : user.getName());
+            user.setEmail(email);
             user.setPicture(picture != null ? picture : user.getPicture());
-            userRepository.save(user);
-            return modelMapper.map(user, UserDTO.class);
+        } else {
+            user = new User();
+            user.setProvider(provider);
+            user.setProviderId(providerId);
+            user.setEmail(email);
+            user.setName(name != null ? name : "GitHub User");
+            user.setPicture(picture);
+            user.setUsername(generateUniqueUsername(email));
+            user.setIsVerified(true);
         }
 
-        User user = new User();
-        user.setProvider(provider);
-        user.setProviderId(providerId);
-        user.setEmail(email);
-        user.setName(name != null ? name : "Github User");
-        user.setPicture(picture);
-        user.setUsername(generateUniqueUsername(email));
-        user.setIsVerified(true);
-        user = userRepository.save(user);
-        return modelMapper.map(user, UserDTO.class);
+        try {
+            User savedUser = userRepository.save(user);
+            log.info("Successfully saved/updated OAuth2 user --> id={}, email={}, provider={}", savedUser.getId(), savedUser.getEmail(), provider);
+            return modelMapper.map(savedUser, UserDTO.class);
+        } catch (Exception e) {
+            log.error("Failed to save/update OAuth2 user for email {}: {}", email, e.getMessage(), e);
+            throw new RuntimeException("Failed to process OAuth2 user registration", e);
+        }
     }
 
     @Override
@@ -177,15 +184,15 @@ public class AuthServiceImpl implements AuthService {
         String email = authentication.getPrincipal().getAttribute("email");
         String name = authentication.getPrincipal().getAttribute("name");
         String picture = authentication.getPrincipal().getAttribute("avatar_url");
-//        String login = authentication.getPrincipal().getAttribute("login");
+
         if (email == null) {
             String accessToken = authentication.getPrincipal().getAttribute("access_token");
             email = fetchGitHubEmail(accessToken);
         }
+
         return handleOAuth2User(provider, providerId, email, name, picture);
     }
 
-//    This will let GitHub API to retrieve the user’s email if the OAuth2 response lacks it (If the user email is private)
     private String fetchGitHubEmail(String accessToken) {
         String url = "https://api.github.com/user/emails";
         HttpHeaders headers = new HttpHeaders();
@@ -227,7 +234,7 @@ public class AuthServiceImpl implements AuthService {
         magicLink.setExpiresAt(Instant.now().plusMillis(magicLinkExpiration));
         magicLinkRepository.save(magicLink);
 
-        String link = String.format("%s/auth/magic-link/validatelink?magic-link\n=%s", frontendUrl, securedLink);
+        String link = String.format("%s/auth/magic-link/validatelink?magic-link=%s", frontendUrl, securedLink);
         emailService.sendMagicLink(email, link);
         log.info("Magic link sent to {} with securedLink: {}", email, securedLink);
     }
