@@ -345,3 +345,67 @@ curl -X POST https://stream-repo-l30u.onrender.com/api/auth/reset-password \
 - **Security**: Passwords are encrypted; magic links and reset tokens are time-limited.
 - **Timeouts**: 20-second timeout for database/email operations.
 
+# Waiting List API
+
+### `POST /waiting-list/user`
+- **Purpose**: Register a user on the waiting list.
+
+#### Request
+- **Method**: `POST`
+- **URL**: `https://stream-repo-l30u.onrender.com/waiting-list/user`
+- **Headers**: `Content-Type: application/json`
+- **Body**:
+  ```json
+  {
+    "name": "John Doe",
+    "email": "john@example.com"
+  }
+  ```
+  - `name`: Required, must not be empty.
+  - `email`: Required, must be a valid format (e.g., `user@example.com`).
+
+#### Response
+- **Success (201 Created)**:
+  - Status: `201`
+  - Body:
+    ```json
+    {
+      "timestamp": "2025-08-06T13:25:00",
+      "message": "Successfully added to waiting list",
+      "status": "201",
+      "path": "/waiting-list/user"
+    }
+    ```
+- **Error (400 Bad Request)**:
+  - Status: `400`
+  - Body (e.g., invalid email):
+    ```json
+    {
+      "timestamp": "2025-08-06T13:25:00",
+      "message": "Invalid email format",
+      "status": "400",
+      "path": "/waiting-list/user"
+    }
+    ```
+- **Error (409 Conflict)**:
+  - Status: `409`
+  - Body (e.g., duplicate email):
+    ```json
+    {
+      "timestamp": "2025-08-06T13:25:00",
+      "message": "You are already on our waiting list, we will keep you in touch",
+      "status": "409",
+      "path": "/waiting-list/user"
+    }
+    ```
+- **Error (500 Internal Server Error)**:
+  - Status: `500`
+  - Body (e.g., database failure):
+    ```json
+    {
+      "timestamp": "2025-08-06T13:25:00",
+      "message": "An unexpected error occurred, please try again later",
+      "status": "500",
+      "path": "/waiting-list/user"
+    }
+    ```
