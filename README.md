@@ -54,14 +54,6 @@ POST /api/auth/register
 - **Errors**:
   - `400 Bad Request`: Invalid email, weak password, or duplicate username/email.
   - `500 Internal Server Error`: Database or email service failure.
-
-### Example
-```bash
-curl -X POST https://stream-repo-l30u.onrender.com/api/auth/register \
--H "Content-Type: application/json" \
--d '{"username":"zipDemon","email":"okoroaforkelechi123@streamrepo.com","password":"SecurePass123!","name":"Kelechi Divine","bio":"Javascript is fun","picture":""}'
-```
-
 ---
 
 ## 2. Login
@@ -109,14 +101,6 @@ POST /api/auth/login
     "status": "UNAUTHORIZED"
   }
   ```
-
-### Example
-```bash
-curl -X POST https://stream-repo-l30u.onrender.com/api/auth/login \
--H "Content-Type: application/json" \
--d '{"username":"zipDemon","password":"SecurePass123!"}'
-```
-
 ---
 
 ## 3. Request Magic Link
@@ -159,14 +143,6 @@ POST /api/auth/magic-link
     "status": "BAD_REQUEST"
   }
   ```
-
-### Example
-```bash
-curl -X POST https://stream-repo-l30u.onrender.com/api/auth/magic-link \
--H "Content-Type: application/json" \
--d '{"email":"okoroaforkelechi123@streamrepo.com"}'
-```
-
 ---
 
 ## 4. Validate Magic Link
@@ -206,12 +182,6 @@ GET /api/auth/validate-magic-link
     "status": "BAD_REQUEST"
   }
   ```
-
-### Example
-```bash
-curl -X GET "https://stream-repo-l30u.onrender.com/api/auth/validate-magic-link?link=abc123xyz"
-```
-
 ---
 
 ## 5. OAuth2 GitHub Authentication
@@ -285,13 +255,6 @@ POST /api/auth/forgot-password
   - `400 Bad Request`: User not found or unverified.
   - `500 Internal Server Error`: Email service failure.
 
-### Example
-```bash
-curl -X POST https://stream-repo-l30u.onrender.com/api/auth/forgot-password \
--H "Content-Type: application/json" \
--d '{"email":"okoroaforkelechi123@streamrepo.com"}'
-```
-
 ---
 
 ## 7. Reset Password
@@ -331,13 +294,6 @@ POST /api/auth/reset-password
 - **Errors**:
   - `400 Bad Request`: Invalid/expired token or weak password.
   - `500 Internal Server Error`: Database failure.
-
-### Example
-```bash
-curl -X POST https://stream-repo-l30u.onrender.com/api/auth/reset-password \
--H "Content-Type: application/json" \
--d '{"link":"xyz789abc","newPassword":"NewSecurePass123!"}'
-```
 
 ---
 
@@ -409,3 +365,4 @@ curl -X POST https://stream-repo-l30u.onrender.com/api/auth/reset-password \
       "path": "/waiting-list/user"
     }
     ```
+
