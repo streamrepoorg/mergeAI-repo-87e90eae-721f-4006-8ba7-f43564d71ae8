@@ -36,6 +36,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String host = request.getServerName();
         int port = request.getServerPort();
         String fullHost = host + ":" + port;
+
         log.info("Server detected: {}, Origin: {}, Routing to {}", fullHost, origin, origin != null ? origin : fullHost);
 
         String profileHost = origin != null ? origin.replace("http://", "").replace("https://", "") : fullHost;
