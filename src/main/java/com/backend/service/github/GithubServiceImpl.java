@@ -90,7 +90,7 @@ public class GithubServiceImpl implements GithubService {
     @Override
     public String processRepository(String githubLink) {
         try {
-            if (!gitLinkValidator.isValidGitHubLink(githubLink)) {
+            if (gitLinkValidator.isValidGitHubLink(githubLink)) {
                 throw new IllegalArgumentException("Invalid GitHub link: " + githubLink);
             }
             String repositoryId = UUID.randomUUID().toString();
@@ -142,7 +142,7 @@ public class GithubServiceImpl implements GithubService {
         String clonePath = null;
         try {
             sendWebSocketUpdate(repositoryId, "Starting repository processing...", "INFO");
-            if (!gitLinkValidator.isValidGitHubLink(repository.getGithubLink())) {
+            if (gitLinkValidator.isValidGitHubLink(repository.getGithubLink())) {
                 updateRepositoryStatus(repository, GitStatus.FAILED, GitStatus.FAILED);
                 throw new GithubProcessingException("Invalid GitHub link: " + repository.getGithubLink());
             }

@@ -30,10 +30,10 @@ public class GithubLinkValidator {
         }
         String normalizedLink = link.trim().replaceAll("/+$", "");
         if (Pattern.matches(REPO_PATTERN, normalizedLink)) {
-            return !validateRepositoryLink(normalizedLink);
+            return validateRepositoryLink(normalizedLink);
         }
         else if (Pattern.matches(USER_PATTERN, normalizedLink)) {
-            return !validateUserLink(normalizedLink);
+            return validateUserLink(normalizedLink);
         }
         else {
             throw new GithubNotFoundException("Invalid GitHub link format: " + link);
